@@ -16,8 +16,10 @@ class MusicDataset():
 
 
     @abstractmethod
-    def parse_abc_txt(self):
-        """
-        return: Iterator over the dataset
-        """
+    def parse_abc(self):
+        pass
+
+
+    @abstractmethod
+    def tokenize(self):
         pass
