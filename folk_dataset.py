@@ -37,18 +37,29 @@ class FolkDataset(MusicDataset):
         return(output)
 
 
+    def load_dataset(self, seq_len_lower = 128, seq_len_upper = 256): # check if you have folk.csv file under data/cache/raw
+        '''
 
-
-    def load_dataset(self): # check if you have nottingham.csv file under data/cache/raw
+        :param seq_len_lower: lower bound of seq_len
+        :param seq_len_upper: upper bound of seq_len
+        :return: None
+        '''
 
         # load raw from cache , add start and end tokens and paddings
-        df = pd.read_csv('data/cache/raw/nottingham.csv')
+        df = pd.read_csv('data/cache/raw/folk.csv')
 
-        note, beat, beatStrength = [['<s>'] + ast.literal_eval(n) + ['</s>'] for n in df['note']], \
-                                   [['<s>'] + ast.literal_eval(n) + ['</s>'] for n in df['beat']], \
-                                   [['<s>'] + ast.literal_eval(n) + ['</s>'] for n in df['beat_strength']]
+        note, beat, beatStrength = [ast.literal_eval(n) for n in df['note']], \
+                                   [ast.literal_eval(n) for n in df['beat']], \
+                                   [ast.literal_eval(n) for n in df['beat_strength']]
 
-        self.note, self.beat, self.beatStrength = note, beat, beatStrength
+        # only retain samples with desired seq_length
+        note_portion, beat_portion, beatStrength_portion = [n for n in note if len(n) >= seq_len_lower and len(n) <= seq_len_upper], \
+                                                           [n for n in beat if len(n) >= seq_len_lower and len(n) <= seq_len_upper], \
+                                                           [n for n in beatStrength if len(n) >= seq_len_lower and len(n) <= seq_len_upper]
+
+        self.note, self.beat, self.beatStrength = note_portion, beat_portion, beatStrength_portion
+        return(note_portion, beat_portion, beatStrength_portion)
+
 
 
     def tokenize(self):
@@ -58,5 +69,15 @@ class FolkDataset(MusicDataset):
 
 
 ds = FolkDataset()
-ds.parse_abc()
+ds.load_dataset()
 
+past, mask, future = slicing_by_fraction(ds.note)
+
+
+padded_past = add_padding(past, position = 'left')
+padded_future = add_padding(future, position = 'right')
+
+
+
+max(len(x) for x in padded_past) - min(len(x) for x in padded_past)
+max(len(x) for x in padded_future) - min(len(x) for x in padded_future)
