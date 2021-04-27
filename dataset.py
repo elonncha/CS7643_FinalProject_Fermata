@@ -23,3 +23,8 @@ class MusicDataset():
     @abstractmethod
     def tokenize(self):
         pass
+
+
+    @abstractmethod
+    def load_dataset(self):
+        pass

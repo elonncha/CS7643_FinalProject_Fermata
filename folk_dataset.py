@@ -6,11 +6,11 @@ import pandas as pd
 import numpy as np
 import ast
 
-class NottinghamDataset(MusicDataset):
-    def __init__(self,dataset_name = 'nottingham'):
-        super(NottinghamDataset, self).__init__(dataset_name = dataset_name)
+class FolkDataset(MusicDataset):
+    def __init__(self,dataset_name = 'folk'):
+        super(FolkDataset, self).__init__(dataset_name = dataset_name)
 
-    def parse_abc(self):
+    def parse_abc(self):  # this function takes very long time to run
         '''
         parse the raw abc file (txt) and return a list of songs with selected features (notes, beats, etc,.)
         :return: output, a python list. At the same time write a csv into data/cache/raw
@@ -20,27 +20,24 @@ class NottinghamDataset(MusicDataset):
 
         # parse abc using music21.converter.parse
         file_name = os.listdir('data/' + self.dataset_name)
-        for f in file_name:
-            path = 'data/' + self.dataset_name + '/' + f
-            print('Parsing {0}...'.format(f))
-            abc = music21.converter.parse(path)
-            print('Parse succeeds!')
+        for f in tqdm(file_name):
+            try:
+                path = 'data/' + self.dataset_name + '/' + f
+                abc = music21.converter.parse(path)
+                output.append(collect_ABCFormat_data_single(abc))
+            except:
+                continue
 
-            output += collect_ABCFormat_data(abc)
+        print('process completed!')
 
-        self.data_list = output
-
+        # write to csv
         df = pd.DataFrame(output)
-        df.song_id = range(len(output))
-        df.set_index('song_id')
         df.to_csv('data/cache/raw/{0}.csv'.format(self.dataset_name))
 
         return(output)
 
 
-    def tokenize(self):
 
-        pass
 
     def load_dataset(self): # check if you have nottingham.csv file under data/cache/raw
 
@@ -54,7 +51,12 @@ class NottinghamDataset(MusicDataset):
         self.note, self.beat, self.beatStrength = note, beat, beatStrength
 
 
+    def tokenize(self):
+
+        pass
 
 
-ds = NottinghamDataset()
-ds.load_dataset()
+
+ds = FolkDataset()
+ds.parse_abc()
+
