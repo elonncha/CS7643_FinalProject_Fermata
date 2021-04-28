@@ -4,7 +4,7 @@ import numpy as np
 import os
 import torch
 from sklearn import preprocessing
-
+import pandas as pd
 
 def collect_ABCFormat_data(abc):
     '''
@@ -66,6 +66,49 @@ def collect_ABCFormat_data_single(abc):
 
     return (dic)
 
+
+
+def parse_folk_by_txt(meter = '4/4', seq_len_min = 256, seq_len_max = 256+32):
+    file_name = 'data/folk.txt'
+    with open(file_name, 'r') as f:
+        raw = f.readlines()
+        f.close()
+
+    raw_txt, note, length = [], [], []
+    for ite, line in enumerate(raw):
+        if "T:" in line:
+            continue
+        elif 'M:' in line:
+            if meter in line:
+                # raw = raw[ite-1] + line + raw[ite+1] + raw[ite+2]
+                song = raw[ite+2].replace('\n', '').split()
+
+                note.append(song)
+                # raw_txt.append(raw)
+        else:
+            continue
+
+
+    song_id = [idx for idx, n in enumerate(note) if seq_len_min<= len(n)-n.count('|') <= seq_len_max]
+    note = [note[i] for i in song_id]
+
+
+    measure = []
+    for i in range(len(note)):
+
+        current_m = 0
+        measure_embed = []
+        for n in note[i]:
+            if n == '|':
+                current_m += 1
+            else:
+                measure_embed.append(current_m)
+
+        measure.append(measure_embed)
+        note[i] = [x for x in note[i] if x != '|']
+
+
+    return(note, measure, song_id)
 
 
 

@@ -81,3 +81,14 @@ padded_future = add_padding(future, position = 'right')
 
 max(len(x) for x in padded_past) - min(len(x) for x in padded_past)
 max(len(x) for x in padded_future) - min(len(x) for x in padded_future)
+
+
+
+path = 'data/folk/tune_200.abc'
+abc = music21.converter.parse(path)
+
+
+n = abc.flat.notes[6]
+
+
+n = music21.note.Note('E4', quarterLength = 1.5)
