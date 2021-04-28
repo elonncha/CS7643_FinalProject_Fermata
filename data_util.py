@@ -171,10 +171,4 @@ def manual_encoding(array, dic):
 
 
 
-def train_test_validation_split(sample_size, train_frac = 0.7, test_frac = 0.15):
-
-
-
-
-
 
