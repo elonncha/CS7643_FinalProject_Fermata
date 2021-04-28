@@ -153,15 +153,28 @@ def add_padding(list, position):
 
 
 
+def build_dictionary(list):
+    u = np.array([])
+    for i in list:
+        u = np.concatenate((np.unique(np.array(i)), u))
+    u = np.unique(u)
+    return(u)
 
-def to_tensor(padded_list):
-    seq_array = np.array(padded_list)
-    shape = seq_array.shape
 
-    encoder = preprocessing.LabelEncoder()
-    targets = encoder.fit_transform(seq_array.reshape(1,-1)[0,:]).reshape(shape[0], shape[1])
+def manual_encoding(array, dic):
+    for i in range(array.shape[0]):
+        for j in range(array.shape[1]):
+            id = np.argwhere(array[i,j] == dic)[0][0]
+            array[i,j] = id
 
-    seq_tensor = torch.from_numpy(targets)
+    return(array)
+
+
+
+def train_test_validation_split(sample_size, train_frac = 0.7, test_frac = 0.15):
+
+
+
 
 
 
