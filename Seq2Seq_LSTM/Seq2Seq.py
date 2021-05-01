@@ -22,6 +22,7 @@ class Seq2Seq(nn.Module):
         batch_size = note_past.shape[0]
         output_len = note_target.shape[1]
 
+        print('in the seq2seq: ', note_past.shape, measure_past.shape, note_future.shape, measure_future.shape)
         # last hidden representation from encoder
         _, h_past = self.past_encoder(note_past, measure_past)
         _, h_future = self.future_encoder(note_future, measure_future)
@@ -30,6 +31,7 @@ class Seq2Seq(nn.Module):
 
         # first input for the decoder
         input = note_target[:,0].unsqueeze(dim = 1).clone().detach()
+        print('in the seq2seq: ', input)
 
         # always add <s> token as the <sos> token
         outputs = torch.zeros((batch_size, output_len, self.decoder.output_size))
@@ -43,6 +45,8 @@ class Seq2Seq(nn.Module):
 
             # manipulate output to next input
             input = torch.argmax(output, dim = 1).unsqueeze(dim = 1)
+
+        print('in the seq2seq: ', outputs)
 
         #############################################################################
         #                              END OF YOUR CODE                             #

@@ -302,11 +302,19 @@ class INPAINT(Dataset):
         measure_past = self.measure_past[index]
         note_future = self.note_future[index]
         measure_future = self.measure_future[index]
-        return (note_past, measure_past), (note_future, measure_future)
+        target = self.target[index]
+        p = [x.shape for x in [note_past, measure_past, note_future, measure_future, target]]
+        return note_past, measure_past, note_future, measure_future, target
 
-    def vocab_size(self):
+    def note_vocab_size(self):
         _, _, _, _, _, _, note_dict, _ = load_data()
         return np.array(note_dict).shape[0]
+
+    def measure_vocab_size(self):
+        return 43
+
+    def target_note_vocab_size(self):
+        return 93
 
     def seq_length(self):
         return self.note_past.shape[1], self.note_future.shape[1]

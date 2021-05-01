@@ -16,7 +16,7 @@ past_measure = torch.tensor(data_train[3])[0:128,:] # 128*87
 future_note = torch.tensor(data_train[2])[0:128,:] # 128*88
 future_measure = torch.tensor(data_train[5])[0:128,:] # 128*88
 target = torch.tensor(data_train[1])[0:128,:] # 128*117
-
+print(past_note.shape[1], future_note.shape[1])
 
 
 
@@ -44,5 +44,5 @@ predicted_note = np.empty_like(prediction, dtype = 'str')
 for i in range(prediction.shape[0]):
     for j in range(prediction.shape[1]):
         predicted_note[i,j] = note_dic[prediction[i,j].item()]
-
+        print(predicted_note)
 
