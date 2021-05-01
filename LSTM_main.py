@@ -33,9 +33,15 @@ measure_future_val, measure_future_test = train_test_split(note_past_test,
                                                            measure_pass_test,
                                                            measure_future_test, test_size = 0.5)
 
-data_train = [note_past_train, note_future_train, measure_past_train, measure_future_train, note_target_train]
-data_val = [note_past_val, note_future_val, measure_past_val, measure_future_val, note_target_val]
-data_test = [note_past_test, note_future_test, measure_pass_test, measure_future_test, note_target_test]
+data_train = [note_past_train, note_future_train,
+              measure_past_train, measure_future_train,
+              note_target_train]
+data_val = [note_past_val, note_future_val,
+            measure_past_val, measure_future_val,
+            note_target_val]
+data_test = [note_past_test, note_future_test,
+             measure_pass_test, measure_future_test,
+             note_target_test]
 data = [data_train, data_val, data_test]
 ds_names = ['train', 'val', 'test']
 
