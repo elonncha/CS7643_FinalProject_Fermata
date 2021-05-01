@@ -17,11 +17,13 @@ note_future_train, note_future_test, \
 note_target_train, note_target_test, \
 measure_past_train, measure_past_test, \
 measure_future_train, measure_future_test, \
+measure_mask_train, measure_mask_test, \
 song_id_train, song_id_test = train_test_split(note_past,
                                                note_future,
                                                note_target,
                                                measure_past,
                                                measure_future,
+                                               measure_mask,
                                                song_id,
                                                train_size = 0.8)
 
@@ -31,11 +33,13 @@ note_future_val, note_future_test, \
 note_target_val, note_target_test, \
 measure_past_val, measure_past_test, \
 measure_future_val, measure_future_test, \
+measure_mask_val, measure_mask_test, \
 song_id_val, song_id_test = train_test_split(note_past_test,
                                              note_future_test,
                                              note_target_test,
                                              measure_past_test,
                                              measure_future_test,
+                                             measure_mask_test,
                                              song_id_test,
                                              test_size = 0.5)
 
