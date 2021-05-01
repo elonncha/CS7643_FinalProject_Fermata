@@ -4,13 +4,13 @@ import torch.nn as nn
 class Encoder(nn.Module):
     """ The Encoder module of the Seq2Seq model
     """
-    def __init__(self, vocab_size, measure_size, seq_len,
+    def __init__(self, vocab_size, max_measure, seq_len,
                  emb_size,
                  encoder_hidden_size, decoder_hidden_size, dropout = 0.2):
         super(Encoder, self).__init__()
 
         self.vocab_size = vocab_size
-        self.measure_size = measure_size
+        self.max_measure = max_measure
         self.seq_len = seq_len
         self.emb_size = emb_size
         self.encoder_hidden_size = encoder_hidden_size
@@ -19,9 +19,9 @@ class Encoder(nn.Module):
         ''' embedding '''
         self.note_emb = nn.Embedding(num_embeddings=self.vocab_size,
                                      embedding_dim = self.emb_size)
-        self.measure_emb = nn.Embedding(num_embeddings=self.measure_size,
+        self.measure_emb = nn.Embedding(num_embeddings=self.max_measure+3,
                                         embedding_dim = self.emb_size,
-                                        padding_idx = -3)
+                                        padding_idx = 0)
         self.position_emb = nn.Embedding(num_embeddings=self.seq_len,
                                          embedding_dim=self.emb_size)
 
@@ -45,7 +45,7 @@ class Encoder(nn.Module):
 
         note_embedding = self.note_emb(note)
 
-        measure_embedding = self.measure_emb(measure)
+        measure_embedding = self.measure_emb(measure+3)
 
         position = torch.repeat_interleave(torch.arange(0, self.seq_len).unsqueeze(dim=0), measure.shape[0], dim=0)
         position_embedding = self.position_emb(position)
