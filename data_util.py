@@ -1,6 +1,11 @@
 import numpy as np
 import copy
 from sklearn.model_selection import train_test_split
+import pickle
+import os
+import torch
+from torch.utils.data.dataset import Dataset
+
 
 def parse_folk_by_txt(meter = '4/4', seq_len_min = 256, seq_len_max = 256+32):
     '''
@@ -272,3 +277,36 @@ def reconstruct_song(song_id_val,
         output[i][-1] = reverse_note_to_abc(note_predicted[i], measure_val[i])
 
     return(output)
+
+
+class INPAINT(Dataset):
+    def __init__(self, data_root, ds_type):
+        'Initialization: Store important information such as labels and the list of IDs that we wish to generate at each pass.'
+        self.data_root = data_root
+        self.ds_type = ds_type
+        get_dpath = lambda ds_type: os.path.join(data_root, ds_type)
+
+        with open(get_dpath(ds_type), 'rb') as pickle_r:
+            self.data = pickle.load(pickle_r, encoding='bytes')
+            self.note_past = torch.from_numpy(self.data[b'note_past'])
+            self.measure_past = torch.from_numpy(self.data[b'measure_past'])
+            self.note_future = torch.from_numpy(self.data[b'note_future'])
+            self.measure_future = torch.from_numpy(self.data[b'measure_future'])
+            self.target = self.data[b'target'] # list - variable length
+
+    def __len__(self):
+        return len(self.target)
+
+    def __getitem__(self, index):
+        note_past = self.note_past[index]
+        measure_past = self.measure_past[index]
+        note_future = self.note_future[index]
+        measure_future = self.measure_future[index]
+        return (note_past, measure_past), (note_future, measure_future)
+
+    def vocab_size(self):
+        _, _, _, _, _, _, note_dict, _ = load_data()
+        return np.array(note_dict).shape[0]
+
+    def seq_length(self):
+        return self.note_past.shape[1], self.note_future.shape[1]
