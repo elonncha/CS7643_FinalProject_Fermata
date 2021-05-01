@@ -8,30 +8,36 @@ import pickle
 # data load
 note_past, note_target, note_future, \
 measure_past, measure_mask, measure_future, \
-note_dic = load_data()
+note_dic, song_id = load_data()
 
 # train-test split
 np.random.seed(1)
 note_past_train, note_past_test, \
 note_future_train, note_future_test, \
 note_target_train, note_target_test, \
-measure_past_train, measure_pass_test, \
-measure_future_train, measure_future_test = train_test_split(note_past,
-                                                             note_future,
-                                                             note_target,
-                                                             measure_past,
-                                                             measure_future, train_size = 0.8)
+measure_past_train, measure_past_test, \
+measure_future_train, measure_future_test, \
+song_id_train, song_id_test = train_test_split(note_past,
+                                               note_future,
+                                               note_target,
+                                               measure_past,
+                                               measure_future,
+                                               song_id,
+                                               train_size = 0.8)
 
 # test-validation split
 note_past_val, note_past_test, \
 note_future_val, note_future_test, \
 note_target_val, note_target_test, \
-measure_past_val, measure_pass_test, \
-measure_future_val, measure_future_test = train_test_split(note_past_test,
-                                                           note_future_test,
-                                                           note_target_test,
-                                                           measure_pass_test,
-                                                           measure_future_test, test_size = 0.5)
+measure_past_val, measure_past_test, \
+measure_future_val, measure_future_test, \
+song_id_val, song_id_test = train_test_split(note_past_test,
+                                             note_future_test,
+                                             note_target_test,
+                                             measure_past_test,
+                                             measure_future_test,
+                                             song_id_test,
+                                             test_size = 0.5)
 
 data_train = [note_past_train, note_future_train,
               measure_past_train, measure_future_train,
@@ -40,7 +46,7 @@ data_val = [note_past_val, note_future_val,
             measure_past_val, measure_future_val,
             note_target_val]
 data_test = [note_past_test, note_future_test,
-             measure_pass_test, measure_future_test,
+             measure_past_test, measure_future_test,
              note_target_test]
 data = [data_train, data_val, data_test]
 ds_names = ['train', 'val', 'test']
