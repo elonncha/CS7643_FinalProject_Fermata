@@ -41,6 +41,7 @@ def collect_ABCFormat_data(abc):
     return (output)
 
 
+
 def collect_ABCFormat_data_single(abc):
     '''
 
@@ -152,13 +153,13 @@ def add_padding(list, position):
 
 
 
-
 def build_dictionary(list):
     u = np.array([])
     for i in list:
         u = np.concatenate((np.unique(np.array(i)), u))
     u = np.unique(u)
     return(u)
+
 
 
 def manual_encoding(array, dic):
@@ -218,4 +219,64 @@ def load_data():
             note_target[i][j] = np.argwhere(note_dic == note_target[i][j])[0][0]
 
 
-    return(note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic)
+    return(note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id)
+
+
+
+def note_decoder(note, note_dic):
+    note_decoded = []
+    for s in note:
+        decoded = note_dic[s]
+        mask = np.argwhere(np.isin(decoded, ['<e>', '<s>', '</s>']) == False).flatten()
+        decoded = decoded[mask]
+        note_decoded.append(decoded.tolist())
+
+    return(note_decoded)
+
+
+
+def reverse_note_to_abc(note, measure):
+    #TODO
+
+
+def reconstruct_song(song_id_val,
+                     note_past_val, note_future_val, note_target_predicted, note_dic,
+                     measure_past_val):
+
+    # load raw txt song data
+    file_name = 'data/folk.txt'
+    with open(file_name, 'r') as f:
+        raw = f.readlines()
+        f.close()
+    song_raw = []
+    for ite, line in enumerate(raw):
+        if 'M:4/4' in line:
+            song = [raw[ite-1], line, raw[ite+1], raw[ite+2]]
+            song_raw.append(song)
+        else:
+            continue
+    song_raw_val = [song_raw[idx] for idx in song_id_val]
+
+
+    # decode predictions
+    note_past_val, note_target_predicted, note_future_val = note_decoder(note_past_val, note_dic), \
+                                                            note_decoder(note_target_predicted, note_dic), \
+                                                            note_decoder(note_future_val, note_dic)
+
+    # decode measure
+    # TODO
+
+
+    # reconstruct new songs
+    note_predicted = []
+    for i in range(len(song_id_val)):
+        new_song = note_past_val[i] + note_target_predicted[i] + note_future_val[i]
+        note_predicted.append(new_song)
+
+
+    # write into raw txt format
+    song_predicted_raw = []
+
+    for i in range(len(song_raw_val)):
+        # TODO
+        pass
