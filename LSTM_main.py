@@ -4,25 +4,25 @@ import pickle
 from torch.utils.data import DataLoader
 
 # data load
-note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
-data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
-data = [data_train, data_val, data_test]
-ds_names = ['train', 'val', 'test']
+# note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
+# data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
+# data = [data_train, data_val, data_test]
+# ds_names = ['train', 'val', 'test']
 
-# dump to pickle
-for i, ds_name in enumerate(ds_names):
-    path = './dataset_split/'+ds_name
-    with open(path, 'wb') as pickle_w:
-        write = {b'note_past': data[i][0],
-                 b'note_future': data[i][2],
-                 b'measure_past': data[i][3],
-                 b'measure_future': data[i][5],
-                 b'target': data[i][1]}
-        pickle.dump(write, pickle_w)
-    # open test
-    with open(path, 'rb') as pickle_r:
-        dict = pickle.load(pickle_r, encoding='bytes')
-        print(ds_name, dict[b'target'])
+# # dump to pickle
+# for i, ds_name in enumerate(ds_names):
+#     path = './dataset_split/'+ds_name
+#     with open(path, 'wb') as pickle_w:
+#         write = {b'note_past': data[i][0],
+#                  b'note_future': data[i][2],
+#                  b'measure_past': data[i][3],
+#                  b'measure_future': data[i][5],
+#                  b'target': data[i][1]}
+#         pickle.dump(write, pickle_w)
+#     # open test
+#     with open(path, 'rb') as pickle_r:
+#         dict = pickle.load(pickle_r, encoding='bytes')
+#         print(ds_name, dict[b'target'])
 
 
 
@@ -37,7 +37,8 @@ hp = {'batch_size': 10,#128,
       'lr': 0.003,
       'reg': 0.001,
     #   'emb_size': 10,
-      'hidden_size': 256,
+      'enc_hidden_size': 256,
+      'dec_hidden_size': 256,
       'dropout': 0.2
      }
 
@@ -61,6 +62,11 @@ val_loader = torch.utils.data.DataLoader(val_data, batch_size=1, shuffle=False, 
 val_target = val_data.target
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# temp for testing
+from Seq2Seq_LSTM import biLSTMEncoder
+encoder = biLSTMEncoder(batch_size, input_size, seq_length_past, seq_length_future, hp['enc_hidden_size'], hp['dec_hidden_size'], hp['dropout'])
+
 # if model == 'biLSTM':
 #     model = biLSTM(batch_size, input_size, seq_length_past, seq_length_future, hp['hidden_size'], hp['dropout'])
 # if torch.cuda.is_available():
