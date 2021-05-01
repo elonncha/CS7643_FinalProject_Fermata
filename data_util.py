@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-
+from sklearn.model_selection import train_test_split
 
 def parse_folk_by_txt(meter = '4/4', seq_len_min = 256, seq_len_max = 256+32):
     '''
@@ -161,6 +161,31 @@ def load_data():
     note_future = np.array(note_future, dtype='int')
 
     return(note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id)
+
+
+def train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id):
+    # train-test split
+    np.random.seed(1)
+    note_past_train, note_past_test, note_future_train, note_future_test, note_target_train, note_target_test, \
+    measure_past_train, measure_past_test, measure_future_train, measure_future_test, measure_mask_train, measure_mask_test, \
+    song_id_train, song_id_test = train_test_split(note_past,note_future,note_target,
+                                                   measure_past,measure_future,measure_mask,
+                                                   song_id,
+                                                   train_size=0.8)
+
+    # test-validation split
+    note_past_val, note_past_test, note_future_val, note_future_test, note_target_val, note_target_test, \
+    measure_past_val, measure_past_test, measure_future_val, measure_future_test, measure_mask_val, measure_mask_test, \
+    song_id_val, song_id_test = train_test_split(note_past_test,note_future_test,note_target_test,
+                                                 measure_past_test,measure_future_test,measure_mask_test,
+                                                 song_id_test,
+                                                 test_size=0.5)
+
+    train_set = [note_past_train, note_target_train, note_future_train, measure_past_train, measure_mask_train, measure_future_train, song_id_train]
+    test_set = [note_past_test, note_target_test, note_future_test, measure_past_test, measure_mask_test, measure_future_test, song_id_test]
+    val_set = [note_past_val, note_target_val, note_future_val, measure_past_val, measure_mask_val, measure_future_val, song_id_val]
+
+    return(train_set, test_set, val_set)
 
 
 
