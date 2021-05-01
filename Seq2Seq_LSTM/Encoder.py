@@ -67,8 +67,11 @@ class Encoder(nn.Module):
         # linear -relu -linear
         hidden = self.fc2(torch.relu(self.fc1(hidden)))
 
-        # return, hidden [1 x batch_size x decoder_hidden_size]
+        # tanh, hidden: [2 x batch_size x decoder_hidden_size]
         hidden = torch.tanh(hidden)
+
+        # Bidirectional, concatenate bidirectional hidden states into one with shape [batch_size, decoder_hidden_size * 2]
+        hidden = torch.cat((hidden[0,:,:], hidden[1,:,:]), dim = 1)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
