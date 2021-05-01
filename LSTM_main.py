@@ -14,20 +14,25 @@ note_dic = load_data()
 np.random.seed(1)
 note_past_train, note_past_test, \
 note_future_train, note_future_test, \
+note_target_train, note_target_test, \
 measure_past_train, measure_pass_test, \
 measure_future_train, measure_future_test = train_test_split(note_past,
                                                              note_future,
+                                                             note_target,
                                                              measure_past,
                                                              measure_future, train_size = 0.8)
 
 # test-validation split
 note_past_val, note_past_test, \
 note_future_val, note_future_test, \
+note_target_val, note_target_test, \
 measure_past_val, measure_pass_test, \
 measure_future_val, measure_future_test = train_test_split(note_past_test,
                                                            note_future_test,
+                                                           note_target_test,
                                                            measure_pass_test,
                                                            measure_future_test, test_size = 0.5)
+
 
 
 
