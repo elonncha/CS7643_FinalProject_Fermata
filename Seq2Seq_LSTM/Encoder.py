@@ -4,49 +4,63 @@ import torch.nn as nn
 class Encoder(nn.Module):
     """ The Encoder module of the Seq2Seq model
     """
-    def __init__(self, input_size, emb_size, encoder_hidden_size, decoder_hidden_size, dropout = 0.2):
+    def __init__(self, vocab_size, measure_size, seq_len,
+                 emb_size,
+                 encoder_hidden_size, decoder_hidden_size, dropout = 0.2):
         super(Encoder, self).__init__()
 
-        self.input_size = input_size
+        self.vocab_size = vocab_size
+        self.measure_size = measure_size
+        self.seq_len = seq_len
         self.emb_size = emb_size
         self.encoder_hidden_size = encoder_hidden_size
         self.decoder_hidden_size = decoder_hidden_size
 
-        ''' 1) '''
-        self.emb = nn.Embedding(num_embeddings=self.input_size,
-                                embedding_dim = self.emb_size)
+        ''' embedding '''
+        self.note_emb = nn.Embedding(num_embeddings=self.vocab_size,
+                                     embedding_dim = self.emb_size)
+        self.measure_emb = nn.Embedding(num_embeddings=self.measure_size,
+                                        embedding_dim = self.emb_size,
+                                        padding_idx = -3)
+        self.position_emb = nn.Embedding(num_embeddings=self.seq_len,
+                                         embedding_dim=self.emb_size)
 
-        ''' 2) '''
+        ''' LSTM '''
         self.rec = nn.LSTM(input_size = self.emb_size,
                            hidden_size=self.encoder_hidden_size,
                            batch_first=True,
                            bidirectional=True)
 
-        ''' 3) '''
+        ''' FC '''
         self.fc1 = nn.Linear(in_features=self.encoder_hidden_size,
                              out_features=self.encoder_hidden_size)
         self.fc2 = nn.Linear(in_features=self.encoder_hidden_size,
                              out_features=self.decoder_hidden_size)
 
-        ''' 4) '''
+        ''' Drop '''
         self.drop = nn.Dropout(p = dropout)
 
-    def forward(self, input):
-        """ The forward pass of the encoder
-            Args:
-                input (tensor): the encoded sequences of shape (batch_size, seq_len, input_size)
 
-            Returns:
-                output (tensor): the output of the Encoder; later fed into the Decoder.
-                hidden (tensor): the weights coming out of the last hidden unit
-        """
+    def embedding(self, note, measure):
+
+        note_embedding = self.note_emb(note)
+
+        measure_embedding = self.measure_emb(measure)
+
+        position = torch.repeat_interleave(torch.arange(0, self.seq_len).unsqueeze(dim=0), measure.shape[0], dim=0)
+        position_embedding = self.position_emb(position)
+
+        return(note_embedding + measure_embedding + position_embedding)
+
+
+    def forward(self, note, measure):
 
         # embedding and dropout
-        embedding = self.emb(input)
-        embedding = self.drop(embedding)
+        emb = self.embedding(note, measure)
+        emb = self.drop(emb)
 
         # recurrent, output: [batch_size x seq_len x encoder_hidden_size]
-        LSTM = self.rec(embedding)
+        LSTM = self.rec(emb)
         output = LSTM[0]
         hidden = LSTM[1][0]
 
