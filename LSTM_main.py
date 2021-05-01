@@ -5,48 +5,34 @@ from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 import pickle
 
-# load original data
-note, measure, song_id = parse_folk_by_txt(meter = '4/4', seq_len_min = 256, seq_len_max = 256+32)
-# slice by fractions
-note_past, note_target, note_future = slicing_by_fraction(note, past_fraction = 0.3, future_fraction = 0.3)
-measure_past, measure_mask, measure_future = slicing_by_fraction(measure, past_fraction = 0.3, future_fraction = 0.3)
-# add paddings
-note_past, note_future = add_padding(note_past, position = 'left'), \
-                         add_padding(note_future, position = 'right')
-measure_past, measure_future = add_padding(measure_past, position = 'left'), \
-                               add_padding(measure_future, position = 'right')
-# type change
-note_past, note_future, measure_past, measure_future = np.array(note_past), np.array(note_future), np.array(measure_past), np.array(measure_future)
+# data load
+note_past, note_target, note_future, \
+measure_past, measure_mask, measure_future, \
+note_dic = load_data()
+
+# train-test split
+np.random.seed(1)
+note_past_train, note_past_test, \
+note_future_train, note_future_test, \
+measure_past_train, measure_pass_test, \
+measure_future_train, measure_future_test = train_test_split(note_past,
+                                                             note_future,
+                                                             measure_past,
+                                                             measure_future, train_size = 0.8)
+
+# test-validation split
+note_past_val, note_past_test, \
+note_future_val, note_future_test, \
+measure_past_val, measure_pass_test, \
+measure_future_val, measure_future_test = train_test_split(note_past_test,
+                                                           note_future_test,
+                                                           measure_pass_test,
+                                                           measure_future_test, test_size = 0.5)
 
 
 
-# build note dictionary
-note_dic = np.unique(np.concatenate((np.unique(note_past), np.unique(note_future), build_dictionary(note_target))))
-note_char_total_count = note_dic.shape[0]
 
-# encode measure
-measure_past[measure_past == '<e>'] = -3
-measure_past[measure_past == '<s>'] = -2
-measure_future[measure_future == '<e>'] = -3
-measure_future[measure_future == '</s>'] = -1
-measure_past = np.array(measure_past, dtype = 'int')
-measure_future = np.array(measure_future, dtype = 'int')
-
-num_measure = 3 + 1 + np.max(measure_future)
-
-# encode note
-note_past = manual_encoding(note_past, note_dic)
-note_future = manual_encoding(note_future, note_dic)
-note_past = np.array(note_past, dtype = 'int')
-note_future = np.array(note_future, dtype = 'int')
-
-
-note_past, note_future, measure_past, measure_future = torch.from_numpy(note_past),\
-                                                       torch.from_numpy(note_future),\
-                                                       torch.from_numpy(measure_past),\
-                                                       torch.from_numpy(measure_future)
-
-
+'''
 # get dataset split idx
 np.random.seed(0)
 train_percentage = 0.70
@@ -74,3 +60,4 @@ for i, idx in enumerate(ds_idxs):
     with open(path, 'rb') as pickle_r:
         dict = pickle.load(pickle_r, encoding='bytes')
         print(ds_name[i], dict[b'note_past'].shape)
+'''
