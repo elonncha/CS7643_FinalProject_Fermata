@@ -280,7 +280,7 @@ def reconstruct_song(song_id_val,
 
 
 class INPAINT(Dataset):
-    def __init__(self, data_root, ds_type):
+    def __init__(self, data_root, ds_type, use_subset=False, batch_size=None):
         'Initialization: Store important information such as labels and the list of IDs that we wish to generate at each pass.'
         self.data_root = data_root
         self.ds_type = ds_type
@@ -294,15 +294,19 @@ class INPAINT(Dataset):
             self.measure_future = torch.from_numpy(self.data[b'measure_future'])
             self.target = self.data[b'target'] # list - variable length
 
+        data = [self.note_past, self.measure_past, self.note_future, self.measure_future, self.target]
+
+        if use_subset == True:
+            self.data = [(x[:batch_size]) for x in data]
+        else:
+            self.data = data
+
     def __len__(self):
-        return len(self.target)
+        return self.data[4].shape[0]
 
     def __getitem__(self, index):
-        note_past = self.note_past[index]
-        measure_past = self.measure_past[index]
-        note_future = self.note_future[index]
-        measure_future = self.measure_future[index]
-        target = self.target[index]
+        note_past, measure_past, note_future, measure_future, target = [x[index] for x in self.data]
+        shapes = [x.shape for x in [note_past, measure_past, note_future, measure_future, target]]
         return note_past, measure_past, note_future, measure_future, target
 
     def note_vocab_size(self):

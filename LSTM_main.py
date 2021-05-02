@@ -7,6 +7,8 @@ from torch.utils.data import DataLoader
 from Seq2Seq_LSTM.Encoder import Encoder
 from Seq2Seq_LSTM.Decoder import Decoder
 from Seq2Seq_LSTM.Seq2Seq import Seq2Seq
+from ray import tune
+from pathlib import Path
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -56,13 +58,13 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, target_size
                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t')
                    .format(epoch, idx, len(data_loader), iter_time=iter_time, loss=losses))
 
-    avg_loss = losses.avg.item()
-    perplexity = np.exp(avg_val_loss)
+    avg_loss = losses.avg
+    perplexity = np.exp(avg_loss)
 
-    return losses.val.item(), avg_loss, perplexity #all_predictions # only need to convert predictions for test set
+    return losses.val, avg_loss, perplexity #all_predictions # only need to convert predictions for test set
 
 
-def eval(eval_loader, note_dic, model, optimizer, criterion, target_size, mode=None, epoch=1, debug=False):
+def eval(data_loader, note_dic, model, optimizer, criterion, target_size, mode=None, epoch=1, debug=False):
     
     iter_time = AverageMeter()
     losses = AverageMeter()
@@ -87,10 +89,6 @@ def eval(eval_loader, note_dic, model, optimizer, criterion, target_size, mode=N
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
         loss = criterion(output.permute(0, 2, 1), note_target)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
         losses.update(loss.item(), output.shape[0])
         iter_time.update(time.time() - start)
 
@@ -108,63 +106,26 @@ def eval(eval_loader, note_dic, model, optimizer, criterion, target_size, mode=N
                     predicted_notes[i,j] = note_dic[prediction[i,j].item()]
             all_predictions = np.append(all_predictions, predicted_notes, axis=0)
 
-    avg_loss = losses.avg.item()
-    perplexity = np.exp(avg_val_loss)
+    avg_loss = losses.avg
+    perplexity = np.exp(avg_loss)
 
     if mode == 'val':
-        return losses.val.item(), avg_loss, perplexity
+        return losses.val, avg_loss, perplexity
     else:
         return all_predictions
 
-def main(train_test_split=False, debug=False):
+# def trainer(data_root, results_root, use_subset=False, train_test_split=False, debug=False):
+def trainer(hp, checkpoint_dir=None, data=None):
 
-    # data load
+    wd, data_root, results_root, use_subset, debug = data
+    os.chdir(wd) # switch back to original project working directory: when using ray tune, modifying tune's local_dir for logging changes the working directory
+
     note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
 
-    if train_test_split == True:
-        data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
-        data = [data_train, data_val, data_test]
-        ds_names = ['train', 'val', 'test']
-
-        # dump to pickle
-        for i, ds_name in enumerate(ds_names):
-            path = './dataset_split/'+ds_name
-            with open(path, 'wb') as pickle_w:
-                write = {b'note_past': data[i][0],
-                        b'note_future': data[i][2],
-                        b'measure_past': data[i][3],
-                        b'measure_future': data[i][5],
-                        b'target': data[i][1]}
-                pickle.dump(write, pickle_w)
-            # open test
-            with open(path, 'rb') as pickle_r:
-                dict = pickle.load(pickle_r, encoding='bytes')
-                print(ds_name, dict[b'target'])
-
-    # Temp settings before implementing Ray Tune for hyperparameter tuning
-    epochs = 1 # 100
-    # Inpaint paper notes:
-        # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
-        # The Adam algorithm [43] was used for model training, with a learning rate of 1e−3, β1 = 0.9, β2 = 0.999, and ε = 1e−8.
-    hp = {'batch_size': 1,#128,
-        'lr': 0.003,
-        'reg': 0.001,
-        'emb_size': 10,
-        'enc_hidden_size': 256,
-        'dec_hidden_size': 256,
-        'dropout': 0.2
-        }
-    batch_size = hp['batch_size']
- 
-    data_root = './dataset_split'
-    results_root = './results/biLSTM'
-
-    torch.manual_seed(0)
-
-    train_data = INPAINT(data_root, ds_type='train')
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False, drop_last=True)
+    train_data = INPAINT(data_root, ds_type='train', use_subset=use_subset, batch_size=hp['batch_size'])
+    train_loader = DataLoader(train_data, batch_size=hp['batch_size'], shuffle=False, drop_last=False)
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=1, shuffle=False, drop_last=True) # change batch size ?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=50, shuffle=False, drop_last=False) # change batch size ?
 
     note_vocab_size = train_data.note_vocab_size()
     measure_vocab_size = train_data.measure_vocab_size()
@@ -190,16 +151,122 @@ def main(train_test_split=False, debug=False):
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), hp['lr'], weight_decay=hp['reg'])
 
-    for epoch in range(epochs):
+    for epoch in range(hp['epochs']):
 
         train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, target_size, debug=debug)
-
+        
         val_loss, avg_val_loss, val_perplexity = eval(val_loader, note_dic, model, optimizer, criterion, target_size, mode='val', epoch=epoch, debug=debug)
         
         print('Train:\n', train_loss, avg_train_loss, train_perplexity)
         print('Val:\n', val_loss, avg_val_loss, val_perplexity)
 
 
+def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset=False, debug=False):
+
+    # general parameters
+    resume = False
+    epochs = 1 # 50
+    # early stopping parameters
+    grace_period = 1 #5
+    reduction_factor = 2.5
+    brackets = 1
+
+    metric = 'loss'
+    metric_mode = 'min'
+    scheduler = tune.schedulers.AsyncHyperBandScheduler(time_attr='training_iteration', grace_period=grace_period, max_t=epochs, reduction_factor=reduction_factor, brackets=brackets)
+    num_samples = 100
+
+    # Inpaint paper notes:
+        # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
+        # The Adam algorithm [43] was used for model training, with a learning rate of 1e−3, β1 = 0.9, β2 = 0.999, and ε = 1e−8.
+    search_space = {'epochs': epochs,
+                    'batch_size': tune.choice([32, 64, 128, 256, 512]),
+                    'lr': tune.loguniform(1e-4, 9e-1),
+                    'reg': tune.loguniform(1e-8,1e-1),
+                    'emb_size': tune.choice([5, 10, 15, 20]),
+                    'enc_hidden_size': tune.choice([64, 128, 256, 512, 1024]),
+                    'dec_hidden_size': tune.choice([64, 128, 256, 512, 1024]),
+                    'dropout': 0.2
+                    }
+ 
+    start = time.time()
+    analysis = tune.run(
+    tune.with_parameters(trainer,
+                        data=(wd, data_root, results_root, use_subset, debug)),
+                        config=search_space,
+                        metric=metric,
+                        mode=metric_mode,
+                        scheduler=scheduler,
+                        name=exp_name,
+                        local_dir=tensorboard_local_dir,
+                        num_samples=num_samples,
+                        keep_checkpoints_num=1,
+                        checkpoint_score_attr=metric,
+                        max_failures=-1,
+                        resume=resume,
+                        raise_on_failed_trial=False)
+    taken = time.time() - start
+    print(f"Time taken: {taken:.2f} seconds.")
+    print("Best config: ", analysis.get_best_config(metric=metric, mode=metric_mode))
+
+    best_config = analysis.get_best_config(metric=metric, mode=metric_mode)
+    best_result = analysis.best_result
+    print('Best Configuration: {0}\n'.format(m), best_config)
+    print('Best Result: {0}\n'.format(m), best_result)
+
+    print('Loading Best Checkpoint: Evaluating on test set...')
+    best_trial = analysis.get_best_trial(metric=metric, mode=metric_mode, scope='all')
+    path_checkpoint = analysis.get_best_checkpoint(trial=best_trial, metric=metric, mode=metric_mode) + 'checkpoint.pth'
+
+    # TODO: NOT TESTED on eval()
+    # run_test_lmm(data_root, results_root, path_checkpoint, args, config, debug=args.debug, ds_label='val_top')
+    # run_test_lmm(data_root, results_root, path_checkpoint, args, config, debug=args.debug, ds_label='test')
+
+def main(mode):
+    seed = 0
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    wd = os.getcwd()
+    p = Path().absolute()
+    data_root = p/'dataset_split'
+    results_root = p/'results/Seq2Seq_LSTM'
+    exp_name = p/'results/Seq2Seq_LSTM_tensorboard'
+    tensorboard_local_dir = '~'
+    use_subset = True
+    train_test_split = False
+    debug = True
+
+    os.makedirs(results_root, exist_ok=True)
+    os.makedirs(exp_name, exist_ok=True)
+
+
+    if train_test_split == True:
+        # data load
+        note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
+
+        data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
+        data = [data_train, data_val, data_test]
+        ds_names = ['train', 'val', 'test']
+        # dump to pickle
+        for i, ds_name in enumerate(ds_names):
+            path = data_root/ds_name
+            with open(path, 'wb') as pickle_w:
+                write = {b'note_past': data[i][0],
+                        b'note_future': data[i][2],
+                        b'measure_past': data[i][3],
+                        b'measure_future': data[i][5],
+                        b'target': data[i][1]}
+                pickle.dump(write, pickle_w)
+            # open test
+            with open(path, 'rb') as pickle_r:
+                dict = pickle.load(pickle_r, encoding='bytes')
+                print(ds_name, dict[b'target'])
+                
+    if mode == 'hp_search':
+        hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)
+
+
 
 if __name__ == '__main__':
-    main()
+    main(mode='hp_search')
