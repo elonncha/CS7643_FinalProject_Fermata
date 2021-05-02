@@ -25,7 +25,7 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def train(epoch, data_loader, note_dic, model, optimizer, criterion, target_size, debug=False):
+def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=False):
     
     iter_time = AverageMeter()
     losses = AverageMeter()
@@ -63,16 +63,17 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, target_size
     return losses.val, avg_loss, perplexity #all_predictions # only need to convert predictions for test set
 
 
-def eval(data_loader, note_dic, model, optimizer, criterion, target_size, mode=None, epoch=1, debug=False):
+def val(data_loader, model, criterion=None, epoch=1, debug=False):
     
+    if criterion:
+        criterion = criterion
+    else:
+        criterion = nn.CrossEntropyLoss()
+
     iter_time = AverageMeter()
     losses = AverageMeter()
     metric = AverageMeter()
 
-    # only writes to ABC notation if running on test set
-    if mode == 'test':
-        all_predictions = np.zeros((0, target_size))
-    
     for idx, data in enumerate(data_loader):
 
         start = time.time()
@@ -82,23 +83,15 @@ def eval(data_loader, note_dic, model, optimizer, criterion, target_size, mode=N
         with torch.no_grad():
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
-        loss = criterion(output.permute(0, 2, 1), note_target)
-        losses.update(loss.item(), output.shape[0])
-        iter_time.update(time.time() - start)
+            loss = criterion(output.permute(0, 2, 1), note_target)
+            losses.update(loss.item(), output.shape[0])
+            iter_time.update(time.time() - start)
 
         if idx % 10 == 0:
             print(('Epoch: [{0}][{1}/{2}]\t'
                    'Time {iter_time.val:.3f} ({iter_time.avg:.3f})\t'
                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t')
                    .format(epoch, idx, len(data_loader), iter_time=iter_time, loss=losses))
-
-        if mode == 'test':
-            prediction = torch.argmax(output, dim=2)
-            predicted_notes = np.empty_like(prediction, dtype='str')
-            for i in range(prediction.shape[0]):
-                for j in range(prediction.shape[1]):
-                    predicted_notes[i,j] = note_dic[prediction[i,j].item()]
-            all_predictions = np.append(all_predictions, predicted_notes, axis=0)
 
     avg_loss = losses.avg
     perplexity = np.exp(avg_loss)
@@ -108,19 +101,50 @@ def eval(data_loader, note_dic, model, optimizer, criterion, target_size, mode=N
             'Avg Perplexity {avg_perplexity:.4f}\t')
             .format(epoch, avg_loss=avg_loss, avg_perplexity=perplexity))
 
-    if mode == 'val':
-        return losses.val, avg_loss, perplexity
-    else:
-        return all_predictions
+    # do we want to store the metrics we return somewhere?
+    return losses.val, avg_loss, perplexity
 
-# regular training function definition
-# def trainer(data_root, results_root, use_subset=False, train_test_split=False, debug=False):
+
+def test(data_loader, note_dic, model, target_size, debug=False):
+    
+    metric = AverageMeter()
+
+    # only writes to ABC notation if running on test set
+    all_predictions = np.zeros((0, target_size))
+
+    for idx, data in enumerate(data_loader):
+
+        start = time.time()
+
+        note_past, measure_past, note_future, measure_future, note_target = data
+
+        with torch.no_grad():
+            output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
+
+            prediction = torch.argmax(output, dim=2)
+            predicted_notes = np.empty_like(prediction, dtype='str')
+            for i in range(prediction.shape[0]):
+                for j in range(prediction.shape[1]):
+                    predicted_notes[i,j] = note_dic[prediction[i,j].item()]
+            all_predictions = np.append(all_predictions, predicted_notes, axis=0)
+
+    # do we want to store the metrics we return somewhere?
+    # convert_to_song(all_predictions) # may include metrics for song evaluation post-converting to audio file
+    # return perplexity
+
 
 # hyperparameter tuning trainer function definition
 def trainer(hp, checkpoint_dir=None, data=None):
 
+    # specifically for use of ray tune's search space / checkpoint or log directories: hp (hyperparams), checkpoint_dir
+
+    # load normal trainer function arguments
     wd, data_root, results_root, use_subset, debug = data
-    os.chdir(wd) # switch back to original project working directory: when using ray tune, modifying tune's local_dir for logging changes the working directory
+        # note: regular training function definition
+        # def trainer(data_root, results_root, use_subset=False, train_test_split=False, debug=False):
+    
+    # switch back to original project working directory: when using ray tune, modifying tune's local_dir for logging changes the working directory
+    os.chdir(wd)
 
     note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
 
@@ -131,12 +155,11 @@ def trainer(hp, checkpoint_dir=None, data=None):
 
     note_vocab_size = train_data.note_vocab_size()
     measure_vocab_size = train_data.measure_vocab_size()
-    target_size = train_data.target_size()
     seq_length_past, seq_length_future = train_data.seq_length()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # model
+    # initialize model
     past_encoder = Encoder(vocab_size=note_vocab_size, max_measure=measure_vocab_size, seq_len=seq_length_past,
                         emb_size=hp['emb_size'],
                         encoder_hidden_size=hp['enc_hidden_size'], decoder_hidden_size=hp['dec_hidden_size'],
@@ -157,10 +180,10 @@ def trainer(hp, checkpoint_dir=None, data=None):
     # best_pred, best_target = None, None
     for epoch in range(hp['epochs']):
 
-        train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, target_size, debug=debug)
+        train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, debug=debug)
         
-        val_loss, avg_val_loss, val_perplexity = eval(val_loader, note_dic, model, optimizer, criterion, target_size, mode='val', epoch=epoch, debug=debug)
-        
+        val_loss, avg_val_loss, val_perplexity = val(val_loader, model, criterion, epoch=epoch, debug=debug)
+    
         if val_loss <= best:
             best = val_loss
             best_model = copy.deepcopy(model)
@@ -236,9 +259,27 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     print('Getting Best Checkpoint')
     path_checkpoint = analysis.get_best_checkpoint(trial=best_trial, metric=metric, mode=metric_mode) + 'checkpoint.pth'
 
-    ## TODO:
-    # TEST BEST HYPERPARAMETERS ON VALIDATION SET
-    # TEST BEST HYPERPARAMETERS ON TEST SET
+    ########################################################################################################################################################
+
+    ########################################################################################################################################################
+    # Evaluate on validation/test set with best hyperparameters found
+
+    # load data
+    note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
+    val_data = INPAINT(data_root, ds_type='val')
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=50, shuffle=False, drop_last=False) # is this batch size ok?
+    test_data = INPAINT(data_root, ds_type='test')
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=50, shuffle=False, drop_last=False) # is this batch size ok?
+    target_size = val_data.target_size()
+
+    # load best models from best checkpoint
+    best_model, best_model_state, best_optimizer = torch.load(path_checkpoint)
+    best_model.load_state_dict(best_model_state)
+
+    # run
+    val_loss, avg_val_loss, val_perplexity = val(val_loader, best_model)
+    test_perplexity = test(test_loader, note_dic, best_model, target_size)
+
     ########################################################################################################################################################
 
 def main(mode):
@@ -286,7 +327,6 @@ def main(mode):
         ## HOW TO VISUALIZE IN TENSORBORD: tensorboard --logdir YOUR_RAY_TUNE_LOCAL_DIRECTORY
     if mode == 'test':
         tester(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug) # need to implement
-
 
 
 
