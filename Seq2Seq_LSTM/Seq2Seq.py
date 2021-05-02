@@ -31,8 +31,8 @@ class Seq2Seq(nn.Module):
         # first input for the decoder
         input = note_target[:,0].unsqueeze(dim = 1).clone().detach()
 
-        # always add <s> token as the <sos> token
         outputs = torch.zeros((batch_size, output_len, self.decoder.output_size))
+
 
         for seq in range(output_len-1):
 
@@ -44,6 +44,7 @@ class Seq2Seq(nn.Module):
             # manipulate output to next input
             input = torch.argmax(output, dim = 1).unsqueeze(dim = 1)
 
+        outputs[:, 0, 16] = 1  # first input will always be <s> token
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
