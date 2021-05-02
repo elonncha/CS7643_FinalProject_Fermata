@@ -18,7 +18,8 @@ class Encoder(nn.Module):
 
         ''' embedding '''
         self.note_emb = nn.Embedding(num_embeddings=self.vocab_size,
-                                     embedding_dim = self.emb_size)
+                                     embedding_dim = self.emb_size,
+                                     padding_idx = 15)
         self.measure_emb = nn.Embedding(num_embeddings=self.max_measure+3,
                                         embedding_dim = self.emb_size,
                                         padding_idx = 0)
