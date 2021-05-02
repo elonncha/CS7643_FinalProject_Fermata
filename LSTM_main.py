@@ -295,7 +295,7 @@ def main(mode):
     exp_name = p/'results/Seq2Seq_LSTM_tensorboard'
     tensorboard_local_dir = '~'
     use_subset = True
-    train_test_split = False
+    train_test_split = True
     debug = True
 
     os.makedirs(results_root, exist_ok=True)
@@ -308,23 +308,23 @@ def main(mode):
         # data load
         note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
 
-        data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
-        data = [data_train, data_val, data_test]
-        ds_names = ['train', 'val', 'test']
+        train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
+        # data = [data_train, data_val, data_test]
+        # ds_names = ['train', 'val', 'test']
         # dump to pickle
-        for i, ds_name in enumerate(ds_names):
-            path = data_root/ds_name
-            with open(path, 'wb') as pickle_w:
-                write = {b'note_past': data[i][0],
-                        b'note_future': data[i][2],
-                        b'measure_past': data[i][3],
-                        b'measure_future': data[i][5],
-                        b'target': data[i][1]}
-                pickle.dump(write, pickle_w)
-            # open test
-            with open(path, 'rb') as pickle_r:
-                dict = pickle.load(pickle_r, encoding='bytes')
-                print(ds_name, dict[b'target'])
+        # for i, ds_name in enumerate(ds_names):
+        #     path = data_root/ds_name
+        #     with open(path, 'wb') as pickle_w:
+        #         write = {b'note_past': data[i][0],
+        #                 b'note_future': data[i][2],
+        #                 b'measure_past': data[i][3],
+        #                 b'measure_future': data[i][5],
+        #                 b'target': data[i][1]}
+        #         pickle.dump(write, pickle_w)
+        #     # open test
+        #     with open(path, 'rb') as pickle_r:
+        #         dict = pickle.load(pickle_r, encoding='bytes')
+        #         print(ds_name, dict[b'target'])
                 
     if mode == 'hp_search':
         hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)

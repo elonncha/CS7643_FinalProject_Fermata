@@ -190,6 +190,24 @@ def train_test_val_split(note_past, note_target, note_future, measure_past, meas
     test_set = [note_past_test, note_target_test, note_future_test, measure_past_test, measure_mask_test, measure_future_test, song_id_test]
     val_set = [note_past_val, note_target_val, note_future_val, measure_past_val, measure_mask_val, measure_future_val, song_id_val]
 
+    ds_names = ['train', 'val', 'test']
+    data = [train_set, val_set, test_set]
+    for i, ds_name in enumerate(ds_names):
+        path = './dataset_split/'+ds_name
+        with open(path, 'wb') as pickle_w:
+            write = {b'note_past': data[i][0],
+                    b'note_future': data[i][2],
+                    b'measure_past': data[i][3],
+                    b'measure_future': data[i][5],
+                    b'measure_mask': data[i][4],
+                    b'target': data[i][1],
+                    b'song_id': data[i][6]}
+            pickle.dump(write, pickle_w)
+        # open test
+        with open(path, 'rb') as pickle_r:
+            dict = pickle.load(pickle_r, encoding='bytes')
+            print(ds_name, dict[b'target'])
+
     return(train_set, test_set, val_set)
 
 
@@ -202,9 +220,13 @@ def note_decoder(note, note_dic):
     :return:
     '''
     note_decoded = []
+    # print('note shape: ', note)
     for s in note:
+        # print('s: ', type(s))
         decoded = note_dic[s]
+        # print('decoded: ', decoded)
         mask = np.argwhere(np.isin(decoded, ['<e>', '<s>', '</s>']) == False).flatten()
+        # print(decoded)
         decoded = decoded[mask]
         note_decoded.append(decoded.tolist())
 
@@ -278,7 +300,6 @@ def reconstruct_song(song_id_val,
 
     return(output)
 
-
 class INPAINT(Dataset):
     def __init__(self, data_root, ds_type, use_subset=False, batch_size=None):
         'Initialization: Store important information such as labels and the list of IDs that we wish to generate at each pass.'
@@ -292,7 +313,11 @@ class INPAINT(Dataset):
             self.measure_past = torch.from_numpy(self.data[b'measure_past'])
             self.note_future = torch.from_numpy(self.data[b'note_future'])
             self.measure_future = torch.from_numpy(self.data[b'measure_future'])
-            self.target = self.data[b'target'] # list - variable length
+            self.target = self.data[b'target']
+
+            # not in __get__
+            self.measure_mask = self.data[b'measure_mask']
+            self.song_id = self.data[b'song_id']
 
         data = [self.note_past, self.measure_past, self.note_future, self.measure_future, self.target]
 
@@ -314,6 +339,10 @@ class INPAINT(Dataset):
     def note_vocab_size(self):
         _, _, _, _, _, _, note_dict, _ = load_data()
         return np.array(note_dict).shape[0]
+
+    def get_note_dict(self):
+        _, _, _, _, _, _, note_dict, _ = load_data()
+        return np.array(note_dict)
 
     def measure_vocab_size(self):
         return 43
