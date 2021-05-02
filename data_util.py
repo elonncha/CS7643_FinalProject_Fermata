@@ -303,7 +303,6 @@ class INPAINT(Dataset):
         note_future = self.note_future[index]
         measure_future = self.measure_future[index]
         target = self.target[index]
-        p = [x.shape for x in [note_past, measure_past, note_future, measure_future, target]]
         return note_past, measure_past, note_future, measure_future, target
 
     def note_vocab_size(self):

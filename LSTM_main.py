@@ -23,7 +23,7 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def train(epoch, data_loader, model, optimizer, criterion):
+def train(epoch, data_loader, note_dic, model, optimizer, criterion):
     
     iter_time = AverageMeter()
     losses = AverageMeter()
@@ -39,27 +39,23 @@ def train(epoch, data_loader, model, optimizer, criterion):
             device = 'cpu'
 
         note_past, measure_past, note_future, measure_future, note_target = data
-        print('from data loader: ', note_past.shape, measure_past.shape, note_future.shape, measure_future.shape, note_target.shape)
-        outputs = model.forward(note_past, measure_past, note_future, measure_future, note_target)
-        print(outputs.shape)
+        output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
-        prediction = torch.argmax(outputs, dim=2)
-        print(prediction.shape)
+        prediction = torch.argmax(output, dim=2)
 
-        predicted_note = np.empty_like(prediction, dtype = 'str')
+        print(output.shape, note_target.shape)
+        print(output, note_target)
+
+        loss = criterion(output.permute(0, 2, 1), note_target)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        print('Loss: ', loss)
+
+        predicted_note = np.empty_like(prediction, dtype='str')
         for i in range(prediction.shape[0]):
             for j in range(prediction.shape[1]):
                 predicted_note[i,j] = note_dic[prediction[i,j].item()]
-        print(predicted_note.shape)
-
-
-        loss = criterion(output, target)
-
-        optimizer.zero_grad()
-        print('Loss: ', loss)
-
-    #     loss.backward()
-    #     optimizer.step()
 
     #     losses.update(loss.detach().item(), output.shape[0])
 
@@ -72,33 +68,31 @@ def train(epoch, data_loader, model, optimizer, criterion):
     # avg_loss = losses.avg.item()
     # perplexity = np.exp(avg_val_loss)
 
-    return losses.val.item(), avg_loss, perplexity
+    # return losses.val.item(), avg_loss, perplexity
 
 
-# data load
-# note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
-# data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
-# data = [data_train, data_val, data_test]
-# ds_names = ['train', 'val', 'test']
+split = False
+# # data load
+note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
+if split == True:
+    data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
+    data = [data_train, data_val, data_test]
+    ds_names = ['train', 'val', 'test']
 
-# # dump to pickle
-# for i, ds_name in enumerate(ds_names):
-#     path = './dataset_split/'+ds_name
-#     with open(path, 'wb') as pickle_w:
-#         write = {b'note_past': data[i][0],
-#                  b'note_future': data[i][2],
-#                  b'measure_past': data[i][3],
-#                  b'measure_future': data[i][5],
-#                  b'target': data[i][1]}
-#         pickle.dump(write, pickle_w)
-#     # open test
-#     with open(path, 'rb') as pickle_r:
-#         dict = pickle.load(pickle_r, encoding='bytes')
-#         print(ds_name, dict[b'target'])
-
-
-
-
+    # dump to pickle
+    for i, ds_name in enumerate(ds_names):
+        path = './dataset_split/'+ds_name
+        with open(path, 'wb') as pickle_w:
+            write = {b'note_past': data[i][0],
+                    b'note_future': data[i][2],
+                    b'measure_past': data[i][3],
+                    b'measure_future': data[i][5],
+                    b'target': data[i][1]}
+            pickle.dump(write, pickle_w)
+        # open test
+        with open(path, 'rb') as pickle_r:
+            dict = pickle.load(pickle_r, encoding='bytes')
+            print(ds_name, dict[b'target'])
 
 # Temp settings before implementing Ray Tune for hyperparameter tuning
 epochs = 1 # 100
@@ -128,6 +122,12 @@ target_note_vocab_size = train_data.target_note_vocab_size()
 seq_length_past, seq_length_future = train_data.seq_length()
 output_size = note_vocab_size
 
+for i in train_loader:
+    note_past, measure_past, note_future, measure_future, note_target = i
+    print(note_past.shape, measure_past.shape)
+
+
+
 val_data = INPAINT(data_root, ds_type='val')
 val_loader = torch.utils.data.DataLoader(val_data, batch_size=1, shuffle=False, drop_last=True) # change batch size ?
 
@@ -156,7 +156,7 @@ optimizer = torch.optim.Adam(model.parameters(), hp['lr'], weight_decay=hp['reg'
 
 for epoch in range(epochs):
 
-    train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, model, optimizer, criterion)
+    train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion)
 
     # val_loss, avg_val_loss, val_perplexity = evaluate(eval_loader, batch_size, encoder, decoder, model, 'val', criterion, epoch=epoch)
 
