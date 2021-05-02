@@ -253,16 +253,14 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     print('Best Configuration: {0}\n'.format(metric), best_config)
     print('Best Result: {0}\n'.format(metric), best_result)
 
+    ########################################################################################################################################################
+
+    ########################################################################################################################################################
+
+    # load ray tune's best trial/checkpoint
     print('Loading Best Checkpoint: Evaluating on test set...')
     best_trial = analysis.get_best_trial(metric=metric, mode=metric_mode, scope='all')
-    print('Best Trial: ', best_trial)
-    print('Getting Best Checkpoint')
     path_checkpoint = analysis.get_best_checkpoint(trial=best_trial, metric=metric, mode=metric_mode) + 'checkpoint.pth'
-
-    ########################################################################################################################################################
-
-    ########################################################################################################################################################
-    # Evaluate on validation/test set with best hyperparameters found
 
     # load data
     note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
@@ -324,7 +322,6 @@ def main(mode):
                 
     if mode == 'hp_search':
         hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)
-        ## HOW TO VISUALIZE IN TENSORBORD: tensorboard --logdir YOUR_RAY_TUNE_LOCAL_DIRECTORY
     if mode == 'test':
         tester(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug) # need to implement
 
@@ -332,3 +329,6 @@ def main(mode):
 
 if __name__ == '__main__':
     main(mode='hp_search')
+
+    ## mode: 'hp_search', hyperparams search with ray tune
+        # HOW TO VISUALIZE METRICS PLOTTING IN TENSORBORD: tensorboard --logdir YOUR_RAY_TUNE_LOCAL_DIRECTORY
