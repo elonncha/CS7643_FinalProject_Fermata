@@ -34,11 +34,6 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, target_size
     for idx, data in enumerate(data_loader):
 
         start = time.time()
-        if torch.cuda.is_available():
-            data = data.cuda()
-            device = torch.device('cuda')
-        else:
-            device = 'cpu'
 
         note_past, measure_past, note_future, measure_future, note_target = data
 
@@ -60,7 +55,11 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, target_size
 
     avg_loss = losses.avg
     perplexity = np.exp(avg_loss)
-
+    print(('Train Summary:\t'
+            'Epoch: {0}\t'
+            'Avg Loss {avg_loss:.3f}\t'
+            'Avg Perplexity {avg_perplexity:.4f}\t')
+            .format(epoch, avg_loss=avg_loss, avg_perplexity=perplexity))
     return losses.val, avg_loss, perplexity #all_predictions # only need to convert predictions for test set
 
 
@@ -77,11 +76,6 @@ def eval(data_loader, note_dic, model, optimizer, criterion, target_size, mode=N
     for idx, data in enumerate(data_loader):
 
         start = time.time()
-        if torch.cuda.is_available():
-            data = data.cuda()
-            device = torch.device('cuda')
-        else:
-            device = 'cpu'
 
         note_past, measure_past, note_future, measure_future, note_target = data
 
@@ -108,13 +102,21 @@ def eval(data_loader, note_dic, model, optimizer, criterion, target_size, mode=N
 
     avg_loss = losses.avg
     perplexity = np.exp(avg_loss)
+    print(('Evaluation Summary:\t'
+            'Epoch: {0}\t'
+            'Avg Loss {avg_loss:.3f}\t'
+            'Avg Perplexity {avg_perplexity:.4f}\t')
+            .format(epoch, avg_loss=avg_loss, avg_perplexity=perplexity))
 
     if mode == 'val':
         return losses.val, avg_loss, perplexity
     else:
         return all_predictions
 
+# regular training function definition
 # def trainer(data_root, results_root, use_subset=False, train_test_split=False, debug=False):
+
+# hyperparameter tuning trainer function definition
 def trainer(hp, checkpoint_dir=None, data=None):
 
     wd, data_root, results_root, use_subset, debug = data
@@ -125,7 +127,7 @@ def trainer(hp, checkpoint_dir=None, data=None):
     train_data = INPAINT(data_root, ds_type='train', use_subset=use_subset, batch_size=hp['batch_size'])
     train_loader = DataLoader(train_data, batch_size=hp['batch_size'], shuffle=False, drop_last=False)
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=50, shuffle=False, drop_last=False) # change batch size ?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=50, shuffle=False, drop_last=False) # is this batch size ok?
 
     note_vocab_size = train_data.note_vocab_size()
     measure_vocab_size = train_data.measure_vocab_size()
@@ -151,30 +153,46 @@ def trainer(hp, checkpoint_dir=None, data=None):
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), hp['lr'], weight_decay=hp['reg'])
 
+    best = 9999999
+    # best_pred, best_target = None, None
     for epoch in range(hp['epochs']):
 
         train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, target_size, debug=debug)
         
         val_loss, avg_val_loss, val_perplexity = eval(val_loader, note_dic, model, optimizer, criterion, target_size, mode='val', epoch=epoch, debug=debug)
         
-        print('Train:\n', train_loss, avg_train_loss, train_perplexity)
-        print('Val:\n', val_loss, avg_val_loss, val_perplexity)
+        if val_loss <= best:
+            best = val_loss
+            best_model = copy.deepcopy(model)
+            best_optimizer = copy.deepcopy(optimizer)            
+            # best_pred, best_target = pred, target
+            with tune.checkpoint_dir(epoch) as checkpoint_dir:
+                path = os.path.join(checkpoint_dir, 'checkpoint.pth')
+                torch.save((best_model, best_model.state_dict(), best_optimizer.state_dict()), path)
+
+        # tune.report metrics
+        tune.report(val_loss=val_loss, avg_val_loss=avg_val_loss, val_perplexity=val_perplexity,
+                    train_loss=train_loss, avg_train_loss=avg_train_loss, train_perplexity=train_perplexity)
 
 
 def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset=False, debug=False):
 
-    # general parameters
+    ########################################################################################################################################################
+    # CONFIGURE HYPERPARAMETER SEARCH:
+    # general parameters:
     resume = False
     epochs = 1 # 50
-    # early stopping parameters
+    # early stopping parameters:
     grace_period = 1 #5
     reduction_factor = 2.5
     brackets = 1
+    ########################################################################################################################################################
 
-    metric = 'loss'
+    ########################################################################################################################################################
+    metric = 'val_loss'
     metric_mode = 'min'
     scheduler = tune.schedulers.AsyncHyperBandScheduler(time_attr='training_iteration', grace_period=grace_period, max_t=epochs, reduction_factor=reduction_factor, brackets=brackets)
-    num_samples = 100
+    num_samples = 1
 
     # Inpaint paper notes:
         # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
@@ -206,27 +224,25 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
                         resume=resume,
                         raise_on_failed_trial=False)
     taken = time.time() - start
-    print(f"Time taken: {taken:.2f} seconds.")
-    print("Best config: ", analysis.get_best_config(metric=metric, mode=metric_mode))
-
     best_config = analysis.get_best_config(metric=metric, mode=metric_mode)
     best_result = analysis.best_result
-    print('Best Configuration: {0}\n'.format(m), best_config)
-    print('Best Result: {0}\n'.format(m), best_result)
+    print(f"Time Taken: {taken:.2f} seconds.")
+    print('Best Configuration: {0}\n'.format(metric), best_config)
+    print('Best Result: {0}\n'.format(metric), best_result)
 
     print('Loading Best Checkpoint: Evaluating on test set...')
     best_trial = analysis.get_best_trial(metric=metric, mode=metric_mode, scope='all')
+    print('Best Trial: ', best_trial)
+    print('Getting Best Checkpoint')
     path_checkpoint = analysis.get_best_checkpoint(trial=best_trial, metric=metric, mode=metric_mode) + 'checkpoint.pth'
 
-    # TODO: NOT TESTED on eval()
-    # run_test_lmm(data_root, results_root, path_checkpoint, args, config, debug=args.debug, ds_label='val_top')
-    # run_test_lmm(data_root, results_root, path_checkpoint, args, config, debug=args.debug, ds_label='test')
+    ## TODO:
+    # TEST BEST HYPERPARAMETERS ON VALIDATION SET
+    # TEST BEST HYPERPARAMETERS ON TEST SET
+    ########################################################################################################################################################
 
 def main(mode):
     seed = 0
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-
     wd = os.getcwd()
     p = Path().absolute()
     data_root = p/'dataset_split'
@@ -240,6 +256,8 @@ def main(mode):
     os.makedirs(results_root, exist_ok=True)
     os.makedirs(exp_name, exist_ok=True)
 
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
     if train_test_split == True:
         # data load
@@ -265,6 +283,10 @@ def main(mode):
                 
     if mode == 'hp_search':
         hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)
+        ## HOW TO VISUALIZE IN TENSORBORD: tensorboard --logdir YOUR_RAY_TUNE_LOCAL_DIRECTORY
+    if mode == 'test':
+        tester(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug) # need to implement
+
 
 
 
