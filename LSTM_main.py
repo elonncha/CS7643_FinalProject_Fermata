@@ -105,7 +105,7 @@ def val(data_loader, model, criterion=None, epoch=1, debug=False):
     return losses.val, avg_loss, perplexity
 
 
-def test(data_loader, note_dic, model, target_size, debug=False):
+def test(data_loader, note_dic, model, target_size, results_root=None, debug=False):
     
     metric = AverageMeter()
 
@@ -128,9 +128,15 @@ def test(data_loader, note_dic, model, target_size, debug=False):
                     predicted_notes[i,j] = note_dic[prediction[i,j].item()]
             all_predictions = np.append(all_predictions, predicted_notes, axis=0)
 
-    # do we want to store the metrics we return somewhere?
-    # convert_to_song(all_predictions) # may include metrics for song evaluation post-converting to audio file
-    # return perplexity
+    # do we want to store other metrics?
+    path = os.path.join(results_root, 'prediction')
+    with open(path, 'wb') as pickle_w:
+        write = {b'pred': all_predictions}
+        pickle.dump(write, pickle_w)
+    # open test
+    with open(path, 'rb') as pickle_r:
+        dict = pickle.load(pickle_r, encoding='bytes')
+        print('Predicted (Test): ', dict[b'pred'])
 
 
 # hyperparameter tuning trainer function definition
@@ -276,7 +282,7 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
 
     # run
     val_loss, avg_val_loss, val_perplexity = val(val_loader, best_model)
-    test_perplexity = test(test_loader, note_dic, best_model, target_size)
+    test_perplexity = test(test_loader, note_dic, best_model, target_size, results_root)
 
     ########################################################################################################################################################
 
@@ -322,8 +328,9 @@ def main(mode):
                 
     if mode == 'hp_search':
         hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)
-    if mode == 'test':
-        tester(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug) # need to implement
+    # not tested
+    # if mode == 'test':
+    #     tester(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug) # need to implement
 
 
 

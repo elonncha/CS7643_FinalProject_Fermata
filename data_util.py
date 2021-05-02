@@ -302,7 +302,9 @@ class INPAINT(Dataset):
             self.data = data
 
     def __len__(self):
-        return self.data[4].shape[0]
+        ds_length = self.data[4].shape[0]
+        print('Dataset Length ({0}): '.format(self.ds_type), ds_length)
+        return ds_length
 
     def __getitem__(self, index):
         note_past, measure_past, note_future, measure_future, target = [x[index] for x in self.data]
@@ -317,7 +319,9 @@ class INPAINT(Dataset):
         return 43
 
     def target_size(self):
-        return self.target.shape[1]
+        target_length = self.target.shape[1]
+        print('Target Length: ', target_length)
+        return target_length
 
     def seq_length(self):
         return self.note_past.shape[1], self.note_future.shape[1]

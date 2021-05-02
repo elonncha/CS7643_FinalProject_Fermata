@@ -1,0 +1,10 @@
+{
+  "batch_size": 32,
+  "dec_hidden_size": 128,
+  "dropout": 0.2,
+  "emb_size": 20,
+  "enc_hidden_size": 256,
+  "epochs": 1,
+  "lr": 0.014795910205856914,
+  "reg": 0.001014671739441802
+}
