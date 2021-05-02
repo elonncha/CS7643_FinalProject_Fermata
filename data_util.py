@@ -328,7 +328,6 @@ class INPAINT(Dataset):
 
     def __len__(self):
         ds_length = self.data[4].shape[0]
-        print('Dataset Length ({0}): '.format(self.ds_type), ds_length)
         return ds_length
 
     def __getitem__(self, index):
@@ -349,7 +348,6 @@ class INPAINT(Dataset):
 
     def target_size(self):
         target_length = self.target.shape[1]
-        print('Target Length: ', target_length)
         return target_length
 
     def seq_length(self):

@@ -2,27 +2,25 @@ import pickle
 from data_util import *
 
 # temporarily copied here to work on it before putting back in data_util
-def reconstruct_song(song_id_val,
-                     note_past_val, note_future_val, note_target_predicted, note_dic,
-                     measure_past_val, measure_future_val, measure_mask_val):
+# def reconstruct_song(song_id_val,
+#                      note_past_val, note_future_val, note_target_predicted, note_dic,
+#                      measure_past_val, measure_future_val, measure_mask_val):
 
-    # load raw txt song data
-    file_name = 'data/folk.txt'
-    with open(file_name, 'r') as f:
-        raw = f.readlines()
-        f.close()
-    song_raw = []
-    for ite, line in enumerate(raw):
-        if 'M:4/4' in line:
-            song = [raw[ite-1], line, raw[ite+1], raw[ite+2]]
-            song_raw.append(song)
-        else:
-            continue
-    song_raw_val = [song_raw[idx] for idx in song_id_val]
+#     # load raw txt song data
+#     file_name = 'data/folk.txt'
+#     with open(file_name, 'r') as f:
+#         raw = f.readlines()
+#         f.close()
+#     song_raw = []
+#     for ite, line in enumerate(raw):
+#         if 'M:4/4' in line:
+#             song = [raw[ite-1], line, raw[ite+1], raw[ite+2]]
+#             song_raw.append(song)
+#         else:
+#             continue
+#     song_raw_val = [song_raw[idx] for idx in song_id_val]
 
     # decode predictions
-    for i in measure_mask_val:
-        print(i)
 
     # for i in note_target_predicted:
     #     print('i:\n \n',i)
@@ -58,8 +56,10 @@ results_root = './results/Seq2Seq_LSTM/prediction'
 
 with open(results_root, 'rb') as pickle_r:
     dict = pickle.load(pickle_r, encoding='bytes')
-    note_target_pred = dict[b'pred'].tolist()
-
+    raw_score = dict[b'raw_score']
+    note_target_pred = dict[b'abc']
+    print('target: ', note_target_pred, 'raw score: ', raw_score)
+print(len(note_target_pred))
 # did not shuffle data during training so works
 data = INPAINT(data_root='./dataset_split', ds_type='test')
 
@@ -74,8 +74,9 @@ note_past, measure_past, \
 note_past, measure_past, \
     note_future, measure_future = [d.tolist() for d in [note_past, measure_past, note_future, measure_future]]    
 
-for i in target:
-    print(i)
-output = reconstruct_song(song_id, note_past, note_future, note_target_pred, note_dic, measure_past, measure_future, measure_mask)
-# have to manually remove the padding first
+
+output = reconstruct_song(song_id,
+                            note_past, note_future, note_target_pred, note_dic,
+                            measure_past, measure_future, measure_mask)
+
 print(output)

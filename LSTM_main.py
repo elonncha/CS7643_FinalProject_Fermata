@@ -9,6 +9,7 @@ from Seq2Seq_LSTM.Decoder import Decoder
 from Seq2Seq_LSTM.Seq2Seq import Seq2Seq
 from ray import tune
 from pathlib import Path
+import gc
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -25,6 +26,30 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+def predict_song(prediction, target, batch_size, predict_abc=False, note_dic=None):
+    for song_no in range(batch_size):
+        mask_e = np.argwhere(target[song_no,:] == 15).flatten()
+        mask_s = np.argwhere(target[song_no, :] == 14).flatten()
+        for e in mask_e:
+            prediction[song_no][e] = 15
+        for s in mask_s:
+            prediction[song_no][s] = 14
+        print('Prediction: ', prediction)
+
+        if predict_abc == True:
+            predicted_note = []
+            for i in range(prediction.shape[0]):
+                song = []
+                for j in range(prediction.shape[1]):
+                    song.append(note_dic[prediction[i, j].item()])
+                predicted_note.append(song)
+            print('Predicted Note: ', predicted_note)
+
+    if predict_abc == False:
+        return prediction
+    else:
+        return predicted_note
+
 def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=False):
     
     iter_time = AverageMeter()
@@ -38,6 +63,9 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=False
         note_past, measure_past, note_future, measure_future, note_target = data
 
         output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
+
+        prediction = torch.argmax(output, dim=2)
+        prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
 
         loss = criterion(output.permute(0, 2, 1), note_target)
         optimizer.zero_grad()
@@ -82,6 +110,8 @@ def val(data_loader, model, criterion=None, epoch=1, debug=False):
 
         with torch.no_grad():
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
+            prediction = torch.argmax(output, dim=2)
+            prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
 
             loss = criterion(output.permute(0, 2, 1), note_target)
             losses.update(loss.item(), output.shape[0])
@@ -110,54 +140,35 @@ def test(data_loader, note_dic, model, target_size, results_root=None, debug=Fal
     metric = AverageMeter()
 
     # only writes to ABC notation if running on test set
-    all_predictions = [] #np.zeros((0, target_size))
+    raw_score, all_predictions_songs = np.zeros((0, target_size, np.array(note_dic).shape[0])), []
 
     for idx, data in enumerate(data_loader):
 
-        start = time.time()
-
         note_past, measure_past, note_future, measure_future, note_target = data
+
+        start = time.time()
 
         with torch.no_grad():
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
             prediction = torch.argmax(output, dim=2)
+            prediction_songs = predict_song(prediction, note_target, len(data_loader), predict_abc=True, note_dic=note_dic)
 
-            for idx in range(128):
-                mask_e = np.argwhere(data_train[1][0:128,:][idx,:] == 15).flatten()
-            mask_s = np.argwhere(data_train[1][0:128, :][idx, :] == 14).flatten()
-            for e in mask_e:
-                prediction[idx][e] = 15
-            for s in mask_s:
-                prediction[idx][s] = 14
-
-            predicted_note = []
-            for i in range(prediction.shape[0]):
-                song = []
-                for j in range(prediction.shape[1]):
-                    song.append(note_dic[prediction[i,j].item()])
-                predicted_note.append(song)
-            all_predictions.append(predicted_note)
-
-            # prediction = torch.argmax(output, dim=2)
-            # predicted_notes = np.empty_like(prediction, dtype='str')
-            # for i in range(prediction.shape[0]):
-            #     for j in range(prediction.shape[1]):
-            #         predicted_notes[i,j] = note_dic[prediction[i,j].item()]
-            # all_predictions = np.append(all_predictions, predicted_notes, axis=0)
+            print(output.shape)
+            raw_score = np.append(raw_score, output, axis=0)
+            all_predictions_songs.append(prediction_songs)
 
     # do we want to store other metrics?
     path = os.path.join(results_root, 'prediction')
     with open(path, 'wb') as pickle_w:
-        write = {b'pred': all_predictions}
+        write = {b'raw_score': raw_score,
+                 b'abc': all_predictions_songs}
         pickle.dump(write, pickle_w)
     # open test
     with open(path, 'rb') as pickle_r:
         dict = pickle.load(pickle_r, encoding='bytes')
-        print('Predicted (Test): ', dict[b'pred'])
-
-
-
+        print('Raw Score (Test): ', dict[b'raw_score'])
+        print('ABC (Test): ', dict[b'abc'])
 
 
 # hyperparameter tuning trainer function definition
@@ -178,7 +189,8 @@ def trainer(hp, checkpoint_dir=None, data=None):
     train_data = INPAINT(data_root, ds_type='train', use_subset=use_subset, batch_size=hp['batch_size'])
     train_loader = DataLoader(train_data, batch_size=hp['batch_size'], shuffle=False, drop_last=False)
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=32, shuffle=False, drop_last=False) # is this batch size ok?
+    val_batch_size = 32
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=val_batch_size, shuffle=False, drop_last=False) # is this batch size ok?
 
     note_vocab_size = train_data.note_vocab_size()
     measure_vocab_size = train_data.measure_vocab_size()
@@ -223,6 +235,7 @@ def trainer(hp, checkpoint_dir=None, data=None):
         # tune.report metrics
         tune.report(val_loss=val_loss, avg_val_loss=avg_val_loss, val_perplexity=val_perplexity,
                     train_loss=train_loss, avg_train_loss=avg_train_loss, train_perplexity=train_perplexity)
+        gc.collect()
 
 
 def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset=False, debug=False):
@@ -231,9 +244,9 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     # CONFIGURE HYPERPARAMETER SEARCH:
     # general parameters:
     resume = False
-    epochs = 50 # 50
+    epochs = 1#50 # 50
     # early stopping parameters:
-    grace_period = 5 #5
+    grace_period = 1 #5
     reduction_factor = 2.5
     brackets = 1
     ########################################################################################################################################################
@@ -242,7 +255,7 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     metric = 'val_loss'
     metric_mode = 'min'
     scheduler = tune.schedulers.AsyncHyperBandScheduler(time_attr='training_iteration', grace_period=grace_period, max_t=epochs, reduction_factor=reduction_factor, brackets=brackets)
-    num_samples = 100
+    num_samples = 1#100
 
     # Inpaint paper notes:
         # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
@@ -290,11 +303,12 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     path_checkpoint = analysis.get_best_checkpoint(trial=best_trial, metric=metric, mode=metric_mode) + 'checkpoint.pth'
 
     # load data
+    batch_size = 32
     note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=32, shuffle=False, drop_last=False) # is this batch size ok?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size, shuffle=False, drop_last=False) # is this batch size ok?
     test_data = INPAINT(data_root, ds_type='test')
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=32, shuffle=False, drop_last=False) # is this batch size ok?
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False, drop_last=False) # is this batch size ok?
     target_size = val_data.target_size()
 
     # load best models from best checkpoint

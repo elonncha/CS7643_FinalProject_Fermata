@@ -53,3 +53,4 @@ for i in range(prediction.shape[0]):
     predicted_note.append(song)
 
 
+print(predicted_note)
