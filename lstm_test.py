@@ -9,14 +9,12 @@ note_past, note_target, note_future, measure_past, measure_mask, measure_future,
 data_train, data_test, data_val = train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
 data = [data_train, data_val, data_test]
 
-
-
 past_note = torch.tensor(data_train[0])[0:128,:] # 128*87
 past_measure = torch.tensor(data_train[3])[0:128,:] # 128*87
 future_note = torch.tensor(data_train[2])[0:128,:] # 128*88
 future_measure = torch.tensor(data_train[5])[0:128,:] # 128*88
 target = torch.tensor(data_train[1])[0:128,:] # 128*117
-print(past_note.shape[1], future_note.shape[1])
+
 
 
 
@@ -36,13 +34,22 @@ decoder = Decoder(emb_size = 10, decoder_hidden_size = past_encoder.decoder_hidd
 
 s = Seq2Seq(past_encoder, future_encoder,decoder, device = 'cpu')
 outputs = s.forward(past_note, past_measure, future_note, future_measure, target)
-
-
 prediction = torch.argmax(outputs, dim = 2)
 
-predicted_note = np.empty_like(prediction, dtype = 'str')
+
+for idx in range(128):
+    mask_e = np.argwhere(data_train[1][0:128,:][idx,:] == 15).flatten()
+    mask_s = np.argwhere(data_train[1][0:128, :][idx, :] == 14).flatten()
+    for e in mask_e:
+        prediction[idx][e] = 15
+    for s in mask_s:
+        prediction[idx][s] = 14
+
+predicted_note = []
 for i in range(prediction.shape[0]):
+    song = []
     for j in range(prediction.shape[1]):
-        predicted_note[i,j] = note_dic[prediction[i,j].item()]
-        print(predicted_note)
+        song.append(note_dic[prediction[i,j].item()])
+    predicted_note.append(song)
+
 
