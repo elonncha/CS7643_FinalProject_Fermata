@@ -157,7 +157,7 @@ def trainer(hp, checkpoint_dir=None, data=None):
     train_data = INPAINT(data_root, ds_type='train', use_subset=use_subset, batch_size=hp['batch_size'])
     train_loader = DataLoader(train_data, batch_size=hp['batch_size'], shuffle=False, drop_last=False)
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=50, shuffle=False, drop_last=False) # is this batch size ok?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=32, shuffle=False, drop_last=False) # is this batch size ok?
 
     note_vocab_size = train_data.note_vocab_size()
     measure_vocab_size = train_data.measure_vocab_size()
@@ -210,9 +210,9 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     # CONFIGURE HYPERPARAMETER SEARCH:
     # general parameters:
     resume = False
-    epochs = 1 # 50
+    epochs = 50 # 50
     # early stopping parameters:
-    grace_period = 1 #5
+    grace_period = 5 #5
     reduction_factor = 2.5
     brackets = 1
     ########################################################################################################################################################
@@ -221,18 +221,18 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     metric = 'val_loss'
     metric_mode = 'min'
     scheduler = tune.schedulers.AsyncHyperBandScheduler(time_attr='training_iteration', grace_period=grace_period, max_t=epochs, reduction_factor=reduction_factor, brackets=brackets)
-    num_samples = 1
+    num_samples = 100
 
     # Inpaint paper notes:
         # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
         # The Adam algorithm [43] was used for model training, with a learning rate of 1e−3, β1 = 0.9, β2 = 0.999, and ε = 1e−8.
     search_space = {'epochs': epochs,
                     'batch_size': tune.choice([32, 64, 128, 256, 512]),
-                    'lr': tune.loguniform(1e-4, 9e-1),
-                    'reg': tune.loguniform(1e-8,1e-1),
-                    'emb_size': tune.choice([5, 10, 15, 20]),
-                    'enc_hidden_size': tune.choice([64, 128, 256, 512, 1024]),
-                    'dec_hidden_size': tune.choice([64, 128, 256, 512, 1024]),
+                    'lr': tune.loguniform(1e-6, 9e-1),
+                    'reg': tune.loguniform(1e-6,1e-1),
+                    'emb_size': tune.choice([5, 10, 15, 20, 25]),
+                    'enc_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
+                    'dec_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
                     'dropout': 0.2
                     }
  
@@ -271,9 +271,9 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     # load data
     note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=50, shuffle=False, drop_last=False) # is this batch size ok?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=32, shuffle=False, drop_last=False) # is this batch size ok?
     test_data = INPAINT(data_root, ds_type='test')
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=50, shuffle=False, drop_last=False) # is this batch size ok?
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=32, shuffle=False, drop_last=False) # is this batch size ok?
     target_size = val_data.target_size()
 
     # load best models from best checkpoint
@@ -295,7 +295,7 @@ def main(mode):
     exp_name = p/'results/Seq2Seq_LSTM_tensorboard'
     tensorboard_local_dir = '~'
     use_subset = True
-    train_test_split = True
+    train_test_split = False
     debug = True
 
     os.makedirs(results_root, exist_ok=True)
