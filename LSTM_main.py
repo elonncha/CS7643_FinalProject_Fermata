@@ -110,7 +110,7 @@ def test(data_loader, note_dic, model, target_size, results_root=None, debug=Fal
     metric = AverageMeter()
 
     # only writes to ABC notation if running on test set
-    all_predictions = np.zeros((0, target_size))
+    all_predictions = [] #np.zeros((0, target_size))
 
     for idx, data in enumerate(data_loader):
 
@@ -122,11 +122,29 @@ def test(data_loader, note_dic, model, target_size, results_root=None, debug=Fal
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
             prediction = torch.argmax(output, dim=2)
-            predicted_notes = np.empty_like(prediction, dtype='str')
+
+            for idx in range(128):
+                mask_e = np.argwhere(data_train[1][0:128,:][idx,:] == 15).flatten()
+            mask_s = np.argwhere(data_train[1][0:128, :][idx, :] == 14).flatten()
+            for e in mask_e:
+                prediction[idx][e] = 15
+            for s in mask_s:
+                prediction[idx][s] = 14
+
+            predicted_note = []
             for i in range(prediction.shape[0]):
+                song = []
                 for j in range(prediction.shape[1]):
-                    predicted_notes[i,j] = note_dic[prediction[i,j].item()]
-            all_predictions = np.append(all_predictions, predicted_notes, axis=0)
+                    song.append(note_dic[prediction[i,j].item()])
+                predicted_note.append(song)
+            all_predictions.append(predicted_note)
+
+            # prediction = torch.argmax(output, dim=2)
+            # predicted_notes = np.empty_like(prediction, dtype='str')
+            # for i in range(prediction.shape[0]):
+            #     for j in range(prediction.shape[1]):
+            #         predicted_notes[i,j] = note_dic[prediction[i,j].item()]
+            # all_predictions = np.append(all_predictions, predicted_notes, axis=0)
 
     # do we want to store other metrics?
     path = os.path.join(results_root, 'prediction')
@@ -137,6 +155,9 @@ def test(data_loader, note_dic, model, target_size, results_root=None, debug=Fal
     with open(path, 'rb') as pickle_r:
         dict = pickle.load(pickle_r, encoding='bytes')
         print('Predicted (Test): ', dict[b'pred'])
+
+
+
 
 
 # hyperparameter tuning trainer function definition
