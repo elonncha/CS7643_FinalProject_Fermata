@@ -312,8 +312,8 @@ class INPAINT(Dataset):
     def measure_vocab_size(self):
         return 43
 
-    def target_note_vocab_size(self):
-        return 93
+    def target_size(self):
+        return self.target.shape[1]
 
     def seq_length(self):
         return self.note_past.shape[1], self.note_future.shape[1]
