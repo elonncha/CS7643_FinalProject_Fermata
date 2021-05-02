@@ -23,13 +23,13 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def train(epoch, data_loader, note_dic, model, optimizer, criterion):
+def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=True):
     
     iter_time = AverageMeter()
     losses = AverageMeter()
     metric = AverageMeter()
 
-    for i, data in enumerate(data_loader):
+    for idx, data in enumerate(data_loader):
 
         start = time.time()
         if torch.cuda.is_available():
@@ -43,32 +43,32 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion):
 
         prediction = torch.argmax(output, dim=2)
 
-        print(output.shape, note_target.shape)
-        print(output, note_target)
+        if debug:
+            print(output.shape, note_target.shape)
+            print(output, note_target)
 
         loss = criterion(output.permute(0, 2, 1), note_target)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print('Loss: ', loss)
 
         predicted_note = np.empty_like(prediction, dtype='str')
         for i in range(prediction.shape[0]):
             for j in range(prediction.shape[1]):
                 predicted_note[i,j] = note_dic[prediction[i,j].item()]
 
-    #     losses.update(loss.detach().item(), output.shape[0])
+        losses.update(loss.item(), output.shape[0])
 
-    #     iter_time.update(time.time() - start)
-    #     if idx % 10 == 0:
-    #         print(('Epoch: [{0}][{1}/{2}]\t'
-    #                'Time {iter_time.val:.3f} ({iter_time.avg:.3f})\t'
-    #                'Loss {loss.val:.4f} ({loss.avg:.4f})\t')
-    #                .format(epoch, idx, len(data_loader), iter_time=iter_time, loss=losses))
-    # avg_loss = losses.avg.item()
-    # perplexity = np.exp(avg_val_loss)
+        iter_time.update(time.time() - start)
+        if idx % 10 == 0:
+            print(('Epoch: [{0}][{1}/{2}]\t'
+                   'Time {iter_time.val:.3f} ({iter_time.avg:.3f})\t'
+                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t')
+                   .format(epoch, idx, len(data_loader), iter_time=iter_time, loss=losses))
+    avg_loss = losses.avg.item()
+    perplexity = np.exp(avg_val_loss)
 
-    # return losses.val.item(), avg_loss, perplexity
+    return losses.val.item(), avg_loss, perplexity
 
 
 split = False
