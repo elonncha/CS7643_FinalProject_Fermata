@@ -5,7 +5,7 @@ class Decoder(nn.Module):
     """ The Decoder module of the Seq2Seq model 
         You will need to complete the init function and the forward function.
     """
-    def __init__(self, output_size,emb_size, decoder_hidden_size, dropout = 0.2):
+    def __init__(self, output_size, emb_size, decoder_hidden_size, dropout = 0.2):
         super(Decoder, self).__init__()
 
         self.emb_size = emb_size
@@ -36,7 +36,8 @@ class Decoder(nn.Module):
         embedding = self.emb(input)
         embedding = self.drop(embedding)
 
-        LSTM = self.rec(embedding, (hidden, torch.zeros_like(hidden)))
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        LSTM = self.rec(embedding, (hidden, torch.zeros_like(hidden).to(device)))
         output = LSTM[0]
         hidden = LSTM[1][0]
 

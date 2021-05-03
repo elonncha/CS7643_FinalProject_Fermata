@@ -50,7 +50,7 @@ def predict_song(prediction, target, batch_size, predict_abc=False, note_dic=Non
     else:
         return predicted_note
 
-def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=False):
+def train(epoch, data_loader, note_dic, model, optimizer, criterion, device='cpu', debug=False):
     
     iter_time = AverageMeter()
     losses = AverageMeter()
@@ -58,14 +58,14 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=False
     
     for idx, data in enumerate(data_loader):
 
-        start = time.time()
+        note_past, measure_past, note_future, measure_future, note_target = [x.to(device) for x in data]
 
-        note_past, measure_past, note_future, measure_future, note_target = data
+        start = time.time()
 
         output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
-        prediction = torch.argmax(output, dim=2)
-        prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
+        # prediction = torch.argmax(output, dim=2)
+        # prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
 
         loss = criterion(output.permute(0, 2, 1), note_target)
         optimizer.zero_grad()
@@ -91,7 +91,7 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, debug=False
     return losses.val, avg_loss, perplexity #all_predictions # only need to convert predictions for test set
 
 
-def val(data_loader, model, criterion=None, epoch=1, debug=False):
+def val(data_loader, model, device='cpu', criterion=None, epoch=1, debug=False):
     
     if criterion:
         criterion = criterion
@@ -104,14 +104,15 @@ def val(data_loader, model, criterion=None, epoch=1, debug=False):
 
     for idx, data in enumerate(data_loader):
 
-        start = time.time()
+        note_past, measure_past, note_future, measure_future, note_target = [x.to(device) for x in data]
 
-        note_past, measure_past, note_future, measure_future, note_target = data
+        start = time.time()
 
         with torch.no_grad():
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
-            prediction = torch.argmax(output, dim=2)
-            prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
+
+            # prediction = torch.argmax(output, dim=2)
+            # prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
 
             loss = criterion(output.permute(0, 2, 1), note_target)
             losses.update(loss.item(), output.shape[0])
@@ -135,7 +136,7 @@ def val(data_loader, model, criterion=None, epoch=1, debug=False):
     return losses.val, avg_loss, perplexity
 
 
-def test(data_loader, note_dic, model, target_size, results_root=None, debug=False):
+def test(data_loader, note_dic, model, target_size, results_root=None, device='cpu', debug=False):
     
     metric = AverageMeter()
 
@@ -144,7 +145,7 @@ def test(data_loader, note_dic, model, target_size, results_root=None, debug=Fal
 
     for idx, data in enumerate(data_loader):
 
-        note_past, measure_past, note_future, measure_future, note_target = data
+        note_past, measure_past, note_future, measure_future, note_target = [x.to(device) for x in data]
 
         start = time.time()
 
@@ -154,7 +155,6 @@ def test(data_loader, note_dic, model, target_size, results_root=None, debug=Fal
             prediction = torch.argmax(output, dim=2)
             prediction_songs = predict_song(prediction, note_target, len(data_loader), predict_abc=True, note_dic=note_dic)
 
-            print(output.shape)
             raw_score = np.append(raw_score, output, axis=0)
             all_predictions_songs.append(prediction_songs)
 
@@ -210,8 +210,6 @@ def trainer(hp, checkpoint_dir=None, data=None):
     decoder = Decoder(emb_size=hp['emb_size'], decoder_hidden_size=past_encoder.decoder_hidden_size*4, output_size=note_vocab_size, dropout=hp['dropout'])
     model = Seq2Seq(past_encoder, future_encoder, decoder, device=device)
 
-    if torch.cuda.is_available():
-        model = model.cuda()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), hp['lr'], weight_decay=hp['reg'])
 
@@ -219,9 +217,9 @@ def trainer(hp, checkpoint_dir=None, data=None):
     # best_pred, best_target = None, None
     for epoch in range(hp['epochs']):
 
-        train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, debug=debug)
+        train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, device=device, debug=debug)
         
-        val_loss, avg_val_loss, val_perplexity = val(val_loader, model, criterion, epoch=epoch, debug=debug)
+        val_loss, avg_val_loss, val_perplexity = val(val_loader, model, device=device, criterion=criterion, epoch=epoch, debug=debug)
     
         if val_loss <= best:
             best = val_loss
@@ -244,9 +242,9 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     # CONFIGURE HYPERPARAMETER SEARCH:
     # general parameters:
     resume = False
-    epochs = 1#50 # 50
+    epochs = 50
     # early stopping parameters:
-    grace_period = 1 #5
+    grace_period = 5
     reduction_factor = 2.5
     brackets = 1
     ########################################################################################################################################################
@@ -255,21 +253,31 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     metric = 'val_loss'
     metric_mode = 'min'
     scheduler = tune.schedulers.AsyncHyperBandScheduler(time_attr='training_iteration', grace_period=grace_period, max_t=epochs, reduction_factor=reduction_factor, brackets=brackets)
-    num_samples = 1#100
+    num_samples = 1#\100
 
     # Inpaint paper notes:
         # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
         # The Adam algorithm [43] was used for model training, with a learning rate of 1e−3, β1 = 0.9, β2 = 0.999, and ε = 1e−8.
+    # search_space = {'epochs': epochs,
+    #                 'batch_size': tune.choice([32, 64, 128, 256, 512]),
+    #                 'lr': tune.loguniform(1e-6, 9e-1),
+    #                 'reg': tune.loguniform(1e-6,1e-1),
+    #                 'emb_size': tune.choice([5, 10, 15, 20, 25]),
+    #                 'enc_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
+    #                 'dec_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
+    #                 'dropout': 0.2
+    #                 }
+ 
     search_space = {'epochs': epochs,
-                    'batch_size': tune.choice([32, 64, 128, 256, 512]),
-                    'lr': tune.loguniform(1e-6, 9e-1),
-                    'reg': tune.loguniform(1e-6,1e-1),
-                    'emb_size': tune.choice([5, 10, 15, 20, 25]),
-                    'enc_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
-                    'dec_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
+                    'batch_size': 128,
+                    'lr': 0.0003,
+                    'reg': 1e-8,
+                    'emb_size': 10,
+                    'enc_hidden_size': 512,
+                    'dec_hidden_size': 512,
                     'dropout': 0.2
                     }
- 
+
     start = time.time()
     analysis = tune.run(
     tune.with_parameters(trainer,
@@ -285,7 +293,8 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
                         checkpoint_score_attr=metric,
                         max_failures=-1,
                         resume=resume,
-                        raise_on_failed_trial=False)
+                        raise_on_failed_trial=False,
+                        resources_per_trial={'gpu': 1})
     taken = time.time() - start
     best_config = analysis.get_best_config(metric=metric, mode=metric_mode)
     best_result = analysis.best_result
@@ -311,13 +320,14 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False, drop_last=False) # is this batch size ok?
     target_size = val_data.target_size()
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # load best models from best checkpoint
     best_model, best_model_state, best_optimizer = torch.load(path_checkpoint)
     best_model.load_state_dict(best_model_state)
 
     # run
-    val_loss, avg_val_loss, val_perplexity = val(val_loader, best_model)
-    test_perplexity = test(test_loader, note_dic, best_model, target_size, results_root)
+    val_loss, avg_val_loss, val_perplexity = val(val_loader, best_model, device=device)
+    test_perplexity = test(test_loader, note_dic, best_model, target_size, results_root, device=device)
 
     ########################################################################################################################################################
 
@@ -329,7 +339,7 @@ def main(mode):
     results_root = p/'results/Seq2Seq_LSTM'
     exp_name = p/'results/Seq2Seq_LSTM_tensorboard'
     tensorboard_local_dir = '~'
-    use_subset = True
+    use_subset = False
     train_test_split = False
     debug = True
 

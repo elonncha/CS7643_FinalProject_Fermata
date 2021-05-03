@@ -41,6 +41,8 @@ class Encoder(nn.Module):
         ''' Drop '''
         self.drop = nn.Dropout(p = dropout)
 
+        
+
 
     def embedding(self, note, measure):
 
@@ -48,8 +50,11 @@ class Encoder(nn.Module):
 
         measure_embedding = self.measure_emb(measure+3)
 
-        position = torch.repeat_interleave(torch.arange(0, self.seq_len).unsqueeze(dim=0), measure.shape[0], dim=0)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        position = torch.repeat_interleave(torch.arange(0, self.seq_len).unsqueeze(dim=0).to(device), measure.shape[0], dim=0)
+        position.to(device)
         position_embedding = self.position_emb(position)
+        note_embedding, measure_embedding, position_embedding = [x.to(device) for x in [note_embedding, measure_embedding, position_embedding]]
 
         return(note_embedding + measure_embedding + position_embedding)
 
