@@ -34,7 +34,7 @@ def predict_song(prediction, target, batch_size, predict_abc=False, note_dic=Non
             prediction[song_no][e] = 15
         for s in mask_s:
             prediction[song_no][s] = 14
-        print('Prediction: ', prediction)
+        # print('Prediction: ', prediction)
 
         if predict_abc == True:
             predicted_note = []
@@ -43,7 +43,7 @@ def predict_song(prediction, target, batch_size, predict_abc=False, note_dic=Non
                 for j in range(prediction.shape[1]):
                     song.append(note_dic[prediction[i, j].item()])
                 predicted_note.append(song)
-            print('Predicted Note: ', predicted_note)
+            # print('Predicted Note: ', predicted_note)
 
     if predict_abc == False:
         return prediction
@@ -153,9 +153,9 @@ def test(data_loader, note_dic, model, target_size, results_root=None, device='c
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
             prediction = torch.argmax(output, dim=2)
-            prediction_songs = predict_song(prediction, note_target, len(data_loader), predict_abc=True, note_dic=note_dic)
+            prediction_songs = predict_song(prediction.cpu(), note_target.cpu(), len(data_loader), predict_abc=True, note_dic=note_dic)
 
-            raw_score = np.append(raw_score, output, axis=0)
+            raw_score = np.append(raw_score, output.cpu(), axis=0)
             all_predictions_songs.append(prediction_songs)
 
     # do we want to store other metrics?
@@ -350,27 +350,9 @@ def main(mode):
     np.random.seed(seed)
 
     if train_test_split == True:
-        # data load
         note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
-
         train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
-        # data = [data_train, data_val, data_test]
-        # ds_names = ['train', 'val', 'test']
-        # dump to pickle
-        # for i, ds_name in enumerate(ds_names):
-        #     path = data_root/ds_name
-        #     with open(path, 'wb') as pickle_w:
-        #         write = {b'note_past': data[i][0],
-        #                 b'note_future': data[i][2],
-        #                 b'measure_past': data[i][3],
-        #                 b'measure_future': data[i][5],
-        #                 b'target': data[i][1]}
-        #         pickle.dump(write, pickle_w)
-        #     # open test
-        #     with open(path, 'rb') as pickle_r:
-        #         dict = pickle.load(pickle_r, encoding='bytes')
-        #         print(ds_name, dict[b'target'])
-                
+
     if mode == 'hp_search':
         hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)
     # not tested
