@@ -26,6 +26,19 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+def adjust_learning_rate(optimizer, epoch, learning_rate, steps, warmup):
+    epoch += 1
+    if epoch <= warmup:
+        lr = learning_rate * epoch / warmup
+    elif epoch > steps[1]:
+        lr = learning_rate * 0.01
+    elif epoch > steps[0]:
+        lr = learning_rate * 0.1
+    else:
+        lr = learning_rate
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
 def predict_song(prediction, target, batch_size, predict_abc=False, note_dic=None):
     for song_no in range(batch_size):
         mask_e = np.argwhere(target[song_no,:] == 15).flatten()
@@ -72,7 +85,7 @@ def train(epoch, data_loader, note_dic, model, optimizer, criterion, device='cpu
         loss.backward()
         optimizer.step()
 
-        losses.update(loss.item(), output.shape[0])
+        losses.update(loss.detach().item(), output.detach().shape[0])
         iter_time.update(time.time() - start)
 
         if idx % 10 == 0:
@@ -115,7 +128,7 @@ def val(data_loader, model, device='cpu', criterion=None, epoch=1, debug=False):
             # prediction = predict_song(prediction, note_target, len(data_loader), predict_abc=False)
 
             loss = criterion(output.permute(0, 2, 1), note_target)
-            losses.update(loss.item(), output.shape[0])
+            losses.update(loss.detach().item(), output.detach().shape[0])
             iter_time.update(time.time() - start)
 
         if idx % 10 == 0:
@@ -153,9 +166,9 @@ def test(data_loader, note_dic, model, target_size, results_root=None, device='c
             output = model.forward(note_past, measure_past, note_future, measure_future, note_target)
 
             prediction = torch.argmax(output, dim=2)
-            prediction_songs = predict_song(prediction.cpu(), note_target.cpu(), len(data_loader), predict_abc=True, note_dic=note_dic)
+            prediction_songs = predict_song(prediction.cpu().detach(), note_target.cpu().detach(), len(data_loader), predict_abc=True, note_dic=note_dic)
 
-            raw_score = np.append(raw_score, output.cpu(), axis=0)
+            raw_score = np.append(raw_score, output.cpu().detach(), axis=0)
             all_predictions_songs.append(prediction_songs)
 
     # do we want to store other metrics?
@@ -167,8 +180,8 @@ def test(data_loader, note_dic, model, target_size, results_root=None, device='c
     # open test
     with open(path, 'rb') as pickle_r:
         dict = pickle.load(pickle_r, encoding='bytes')
-        print('Raw Score (Test): ', dict[b'raw_score'])
-        print('ABC (Test): ', dict[b'abc'])
+        # print('Raw Score (Test): ', dict[b'raw_score'])
+        # print('ABC (Test): ', dict[b'abc'])
 
 
 # hyperparameter tuning trainer function definition
@@ -189,8 +202,7 @@ def trainer(hp, checkpoint_dir=None, data=None):
     train_data = INPAINT(data_root, ds_type='train', use_subset=use_subset, batch_size=hp['batch_size'])
     train_loader = DataLoader(train_data, batch_size=hp['batch_size'], shuffle=False, drop_last=False)
     val_data = INPAINT(data_root, ds_type='val')
-    val_batch_size = 32
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=val_batch_size, shuffle=False, drop_last=False) # is this batch size ok?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=len(val_data.target), shuffle=False, drop_last=False) # is this batch size ok?
 
     note_vocab_size = train_data.note_vocab_size()
     measure_vocab_size = train_data.measure_vocab_size()
@@ -217,6 +229,8 @@ def trainer(hp, checkpoint_dir=None, data=None):
     # best_pred, best_target = None, None
     for epoch in range(hp['epochs']):
 
+        adjust_learning_rate(optimizer, epoch, hp['lr'], hp['steps'], hp['warmup'])
+
         train_loss, avg_train_loss, train_perplexity = train(epoch, train_loader, note_dic, model, optimizer, criterion, device=device, debug=debug)
         
         val_loss, avg_val_loss, val_perplexity = val(val_loader, model, device=device, criterion=criterion, epoch=epoch, debug=debug)
@@ -242,7 +256,7 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     # CONFIGURE HYPERPARAMETER SEARCH:
     # general parameters:
     resume = False
-    epochs = 50
+    epochs = 20#100#100
     # early stopping parameters:
     grace_period = 5
     reduction_factor = 2.5
@@ -253,28 +267,32 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     metric = 'val_loss'
     metric_mode = 'min'
     scheduler = tune.schedulers.AsyncHyperBandScheduler(time_attr='training_iteration', grace_period=grace_period, max_t=epochs, reduction_factor=reduction_factor, brackets=brackets)
-    num_samples = 1#\100
+    num_samples = 15#15#1
 
     # Inpaint paper notes:
         # The MeasureVAE model was pre-trained using single measures following the standard VAE optimization equa- tion [26] with the β-weighting scheme [41,42]. 
         # The Adam algorithm [43] was used for model training, with a learning rate of 1e−3, β1 = 0.9, β2 = 0.999, and ε = 1e−8.
     # search_space = {'epochs': epochs,
-    #                 'batch_size': tune.choice([32, 64, 128, 256, 512]),
-    #                 'lr': tune.loguniform(1e-6, 9e-1),
+    #                 'batch_size': tune.choice([64, 128, 256, 512]),
+    #                 'lr': tune.loguniform(1e-3, 9e-1),
+    #                 'warmup': 0,
+    #                 'steps': [tune.uniform(1, 3), tune.uniform(4, 6)],
     #                 'reg': tune.loguniform(1e-6,1e-1),
-    #                 'emb_size': tune.choice([5, 10, 15, 20, 25]),
-    #                 'enc_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
-    #                 'dec_hidden_size': tune.choice([64, 128, 256, 512, 1024, 2048]),
-    #                 'dropout': 0.2
+    #                 'emb_size': tune.choice([10, 15, 20]),
+    #                 'enc_hidden_size': tune.choice([128, 256, 512, 1024]),
+    #                 'dec_hidden_size': tune.choice([128, 256, 512, 1024]),
+    #                 'dropout': tune.choice([0.1, 0.2])
     #                 }
  
     search_space = {'epochs': epochs,
                     'batch_size': 128,
-                    'lr': 0.0003,
-                    'reg': 1e-8,
-                    'emb_size': 10,
+                    'lr': 0.015919,
+                    'warmup': 0,
+                    'steps': [1, 4],
+                    'reg': 5.3977e-06,
+                    'emb_size': 15,
                     'enc_hidden_size': 512,
-                    'dec_hidden_size': 512,
+                    'dec_hidden_size': 256,
                     'dropout': 0.2
                     }
 
@@ -291,7 +309,7 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
                         num_samples=num_samples,
                         keep_checkpoints_num=1,
                         checkpoint_score_attr=metric,
-                        max_failures=-1,
+                        max_failures=3,
                         resume=resume,
                         raise_on_failed_trial=False,
                         resources_per_trial={'gpu': 1})
@@ -312,12 +330,11 @@ def hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_
     path_checkpoint = analysis.get_best_checkpoint(trial=best_trial, metric=metric, mode=metric_mode) + 'checkpoint.pth'
 
     # load data
-    batch_size = 32
     note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
     val_data = INPAINT(data_root, ds_type='val')
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size, shuffle=False, drop_last=False) # is this batch size ok?
+    val_loader = torch.utils.data.DataLoader(val_data, batch_size=len(val_data.target), shuffle=False, drop_last=False) # is this batch size ok?
     test_data = INPAINT(data_root, ds_type='test')
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False, drop_last=False) # is this batch size ok?
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=len(test_data.target), shuffle=False, drop_last=False) # is this batch size ok?
     target_size = val_data.target_size()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -350,9 +367,11 @@ def main(mode):
     np.random.seed(seed)
 
     if train_test_split == True:
+        # data load
         note_past, note_target, note_future, measure_past, measure_mask, measure_future, note_dic, song_id = load_data()
-        train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
 
+        train_test_val_split(note_past, note_target, note_future, measure_past, measure_mask, measure_future, song_id)
+                
     if mode == 'hp_search':
         hp_search(wd, data_root, results_root, exp_name, tensorboard_local_dir, use_subset, debug)
     # not tested
