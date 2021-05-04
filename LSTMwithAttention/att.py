@@ -8,10 +8,6 @@ class AttentionError(Exception):
     pass
 
 class MultiheadedAttention(nn.Module):
-    """
-    Narrow multiheaded attention. Each attention head inspects a 
-    fraction of the embedding space and expresses attention vectors for each sequence position as a weighted average of all (earlier) positions.
-    """
 
     def __init__(self, d_model, heads=8, dropout=0.1, relative_pos=True):
 
@@ -34,11 +30,10 @@ class MultiheadedAttention(nn.Module):
             self.Er = None
 
     def forward(self, x, mask):
-        #batch size, sequence length, embedding dimension
+  
         b, t, e = x.size()
         h = self.heads
-        #each head inspects a fraction of the embedded space
-        #head dimension
+     
         s = e // h
         #start index of position embedding
         embedding_start = self.max_length - t
@@ -77,21 +72,15 @@ class MultiheadedAttention(nn.Module):
             scores[wtf[0], wtf[1], :] = -1e9
 
         
-        #Convert scores to probabilities
         attn_probs = F.softmax(scores, dim=2)
         attn_probs = self.dropout(attn_probs)
-        #use attention to get a weighted average of values
         out = torch.bmm(attn_probs, values).view(b, h, t, s)
-        #transpose and recombine attention heads
         out = out.transpose(1, 2).contiguous().view(b, t, s * h)
-        #last linear layer of weights
         return self.recombine_heads(out)
 
 
     def _mask_positions(self, qe):
-        #QEr is a matrix of queries (absolute position) dot distance embeddings (relative pos).
-        #Mask out invalid relative positions: e.g. if sequence length is L, the query at
-        #L-1 can only attend to distance r = 0 (no looking backward).
+       
         L = qe.shape[-1]
         mask = torch.triu(torch.ones(L, L, device=d()), 1).flip(1)
         return qe.masked_fill((mask == 1), 0)
