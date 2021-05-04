@@ -1,0 +1,31 @@
+X: 95
+T:Hump The Hurver
+% Nottingham Music Database
+S:Trad, arr Phil Rowe
+M:6/8
+K:G
+M:6/8
+|d/2c/2 "D"dcd|"G"Bec "A7"ede|
+"D"fdd "A7"d2A|
+"D"d2A F2A|"E"B2e "A7"ABc|"D"d2A "A7"A2g|"D"fdd d2:|
+P:B
+f/2g/2|"D"a2A A2A|"E7"BAB "A"A3|"A"A3|
+P:C
+|^A/2B/2|"A"c2c cBA|"Em"e2d "A"B2c|"D"d3/2c/2 "D"dcd|"A7"efA A2c|"G"B2c d2d|"Am"e2e c3|"A7"e3 d2c|"D7"d3 A3|"G"d3 -d2::
+b|"D"a2f "A7"d2c|-Bc ABc|"D"d2A d2f|"A"g2e c2e|"D"d3 "A"A2A|"D"def "A7"gec|"D"dcd "A7"^gec|"D"dcd "A7"ede|
+"D"fdf afa|"A"a3 agf|"E7"edB "A"A3|"A"Ace acf|"A"e2c A3:|
+P:B
+A/2G/2|"A"Ace a2f|"A"aee c2A|
+"Em"B3 -B2c|"D"dcd "A"e2e|"A"A3/2B/2c "A"A3|"A"A3/2B/2A|
+"D"A2a a2d|"E"geg "D"a2f|"A"e2c ABc|"D"ded dAF|"G"G2B "D"A2A|"Em"e2e "A7"e2d|"D"ABA f2d|"A"e2e "D"f2a|"Em"agf "A7"gec|"D"d3 -d2:|
+P:B
+f/2g/2|
+"D"afd d2f|"D"d3 d2:|
+P:B
+d/2c/2|"G"B2B "D"A2d|"Em"cde "A"d2B|"A"A3 A3| "E7"e2e e2^f|
+"D"d2A ABA|"Em"G3 G2:|
+P:B
+D|"G"G2G "D"D3:|
+
+"Em"e2e e^def|"Em"g2g3 e2f|b3 Q2B|"D"A3 FAc|"Am"ABc "D7"A2c|"G"B2G "C7"E2G|
+"F#m"ABc "E"dcd|"E"B2B "A"A2]"E7"e3|"A"
