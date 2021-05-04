@@ -1,0 +1,20 @@
+X: 53
+T:Statkin Briggs, via EF
+M:6/8
+K:C
+P:A
+B/2A/2|"G"G2G GAB|A2B B2c|"G7"d^cd BGE|"C"e3 ecA|"D7"d3 -d3|"A7"edc BAG|"D"A2B "Em"B2d|\
+"D7"f2e "Bm"dcB|"Am"cBc "D"d2:|
+P:B
+e|"D"fed "A7"ecA|"G"Bcd "A7"edc|"D"d2e f2a|b2f "D"fga|"Em"gfe edB|"Em"def gfg|"A"acc cBA|"Bm"Bcd "A"ecA|"D"dfa afa|"Bm"d2d "E7"efg|"D"faa "A7"a3|"Dm"faf d2A|d2d def|"G"gfg "Bm"f2d|"Em"e2d "A7"edc|"D"d3 -d^cA|E
+"Em"D3 E2::
+|:e|"D"f2e "D7"fed|"C"cde "G"d2d|"C"e3 -efg|\
+"G"d2B "A7"A2c|"D"d2d d2::
+G|"F"A2A A2A|"D"d2A ABA|"D"d3 "A7"d3|"G"B3 e2"E7"BAB|"Am"c3 A3|"D7"cBA FED|"C"e3 e3|"C"efg g2f|"G"g2a g2f|
+"Em"gef gfe|
+"A7"d2c "D7"d3|
+"G"d2d B3|"G"d3 "G7"f2d|
+"C"e2g g3|"C"e2e "G7"cBc|"C"c2c cBc|G2c e^fg|"Gm"G2G G2B|"C"c2B c2d|"G"B2d B2B|"G"BGE B2d|"C"e2d "Am"c2A|"G"B2A B2A|"D"A2F "Em"G2E|"DEF "E7"E2D|
+"Em"GEE EFG|"A"A2A "D7"FED|"C"C3 -EFE|
+"F"F2E F2A|"C"G2G G2z|"F7"FE=F =FEF|"G"G2G G2A|"G"B2G "D7"A2G|"C"e2c ABc|"D"d3 dcB|c2A A2d|c2A AGA|E2F F2E|"D"DFA A2B|"A7"[E3c][B3d]![2^:c
+f|"D"dff fed|"A"cec "E7"cAB|"A"A2E A2A|"D"FAB a2f|"A
